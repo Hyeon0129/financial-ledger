@@ -2,7 +2,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import type {
   Transaction, Category, Account, Budget, SavingsGoal, RecurringPayment,
@@ -16,19 +17,10 @@ import {
 import './styles.css';
 
 // ========== Types ==========
-type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'recurring' | 'settings' | 'profile';
+type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'recurring' | 'profile';
 
 // ========== Design Tokens (Charts & Icons) ==========
-const CHART_PALETTE = [
-  '#8B5CF6', // Vivid Purple
-  '#EC4899', // Vivid Pink
-  '#3B82F6', // Vivid Blue
-  '#10B981', // Vivid Green
-  '#F59E0B', // Vivid Amber
-  '#EF4444', // Vivid Red
-  '#14B8A6', // Vivid Teal
-  '#F97316', // Vivid Orange
-];
+// (unused palette removed)
 
 const Icons = {
   Plus: () => <span style={{ fontSize: 16, fontWeight: 600 }}>+</span>,
@@ -38,9 +30,9 @@ const Icons = {
 // ========== Main App ==========
 const App: React.FC = () => {
   const [view, setView] = useState<View>('dashboard');
-  const [month] = useState<string>(getMonthKey(new Date()));
+  const [month, setMonth] = useState<string>(getMonthKey(new Date()));
   const [currency, setCurrency] = useState('₩');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme] = useState<'light' | 'dark'>('dark');
   
   // Data states
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -54,8 +46,14 @@ const App: React.FC = () => {
 
   // Apply theme
   useEffect(() => {
-    document.body.setAttribute('data-theme', theme);
-  }, [theme]);
+    document.body.setAttribute('data-theme', 'dark');
+  }, []);
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  }, [month]);
 
   // Load initial data
   useEffect(() => {
@@ -139,10 +137,10 @@ const App: React.FC = () => {
   }, []);
 
   if (loading) {
-    return (
+  return (
       <div className="app-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
         <div className="loading-spinner" />
-      </div>
+        </div>
     );
   }
 
@@ -151,62 +149,72 @@ const App: React.FC = () => {
       <header className="app-header">
         <div className="header-left">
           <img src="https://pyron.dev/_next/image?url=%2Fimages%2Flogo.png&w=48&q=75" alt="Logo" className="header-logo" />
-        </div>
+      </div>
         <nav className="header-center">
           <button 
             className={view === 'dashboard' ? 'active' : ''} 
             onClick={() => setView('dashboard')}
           >
-            Overview
+            Dashboard
           </button>
           <button 
             className={view === 'transactions' ? 'active' : ''} 
             onClick={() => setView('transactions')}
           >
-            Cards
+            Transactions
           </button>
           <button 
             className={view === 'budgets' ? 'active' : ''} 
             onClick={() => setView('budgets')}
           >
-            Friends
+            Budgets
           </button>
           <button 
             className={view === 'reports' ? 'active' : ''} 
             onClick={() => setView('reports')}
           >
-            Analytics
+            Reports
           </button>
           <button 
-            className={view === 'settings' ? 'active' : ''} 
-            onClick={() => setView('settings')}
+            className={view === 'categories' ? 'active' : ''} 
+            onClick={() => setView('categories')}
           >
-            Support
+            Categories
+          </button>
+          <button 
+            className={view === 'accounts' ? 'active' : ''} 
+            onClick={() => setView('accounts')}
+          >
+            Accounts
+          </button>
+          <button 
+            className={view === 'savings' ? 'active' : ''} 
+            onClick={() => setView('savings')}
+          >
+            My Goals
           </button>
         </nav>
-        <div className="header-right"></div>
+        <div className="header-right">
+          <div className="month-nav">
+            <button onClick={() => {
+              const [y, m] = month.split('-').map(Number);
+              const prev = new Date(y, m - 2, 1);
+              setMonth(getMonthKey(prev));
+            }}>{'<'}</button>
+            <div className="month-label">{monthLabel}</div>
+            <button onClick={() => {
+              const [y, m] = month.split('-').map(Number);
+              const next = new Date(y, m, 1);
+              setMonth(getMonthKey(next));
+            }}>{'>'}</button>
+        </div>
+        </div>
       </header>
       <main className="app-main">
         <section className="content">
           <div className="content-header">
-            <button 
-              className="theme-toggle"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              title={theme === 'light' ? '다크 모드로 전환' : '라이트 모드로 전환'}
-            >
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                {theme === 'light' ? (
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                ) : (
-                  <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>
-                )}
-              </svg>
-            </button>
-            <div>
-              <h1 className="page-title">Good Morning <span className="highlight">Jenny</span></h1>
-              <p className="page-subtitle">Stay on top of your tasks, monitor progress, and track status.</p>
-            </div>
-          </div>
+            <h1 className="page-title">{view.charAt(0).toUpperCase() + view.slice(1)}</h1>
+        </div>
           {view === 'dashboard' && (
             <DashboardView 
               stats={stats}
@@ -215,6 +223,7 @@ const App: React.FC = () => {
               savingsGoals={savingsGoals}
               recurringPayments={recurringPayments}
               categories={categories}
+              accounts={accounts}
               currency={currency}
               month={month}
               onNavigate={setView}
@@ -238,6 +247,7 @@ const App: React.FC = () => {
               stats={stats}
               currency={currency}
               month={month}
+            transactions={transactions}
               onRefresh={refreshBudgets}
             />
           )}
@@ -256,11 +266,7 @@ const App: React.FC = () => {
           {view === 'reports' && (
             <ReportsView
               stats={stats}
-              transactions={transactions}
-              categories={categories}
               currency={currency}
-              month={month}
-              theme={theme}
             />
           )}
           {view === 'savings' && (
@@ -279,18 +285,10 @@ const App: React.FC = () => {
               onRefresh={refreshRecurring}
             />
           )}
-          {view === 'settings' && (
-            <SettingsView
-              currency={currency}
-              setCurrency={setCurrency}
-              theme={theme}
-              setTheme={setTheme}
-            />
-          )}
-          {view === 'profile' && <ProfileView />}
+      {view === 'profile' && <ProfileView />}
         </section>
       </main>
-    </div>
+      </div>
   );
 };
 
@@ -302,14 +300,19 @@ const DashboardView: React.FC<{
   savingsGoals: SavingsGoal[];
   recurringPayments: RecurringPayment[];
   categories: Category[];
+  accounts: Account[];
   currency: string;
   month: string;
   onNavigate: (v: View) => void;
   theme: 'light' | 'dark';
-}> = ({ stats, transactions, currency, month, theme }) => {
+}> = ({ stats, transactions, budgets, currency, month, theme, accounts, onNavigate, savingsGoals }) => {
   const isDark = theme === 'dark';
   const axisColor = isDark ? '#d4d4d8' : '#999999';
   const gridColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  const totalIncome = stats?.income ?? 0;
+  const totalExpense = stats?.expense ?? 0;
+  const netRevenue = stats ? stats.balance : 0;
+  const totalBudget = budgets.reduce((sum: number, b: Budget) => sum + b.amount, 0);
   
   // Daily trend chart data
   const chartData = useMemo(() => {
@@ -349,6 +352,17 @@ const DashboardView: React.FC<{
       }));
   }, [stats]);
 
+  const accountUsage = useMemo(() => {
+    const map: Record<string, { spent: number; income: number }> = {};
+    transactions.forEach((t) => {
+      const key = t.account_id || 'unknown';
+      if (!map[key]) map[key] = { spent: 0, income: 0 };
+      if (t.type === 'expense') map[key].spent += t.amount;
+      if (t.type === 'income') map[key].income += t.amount;
+    });
+    return map;
+  }, [transactions]);
+
   if (!stats) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
@@ -362,35 +376,36 @@ const DashboardView: React.FC<{
       {/* First Row: Balance + Earnings Report */}
       <div className="dashboard-row">
         <div className="card balance-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Balance</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-tertiary)' }}>Now</span>
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 8 }}>Your balance</div>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
-              {formatCurrency(stats.balance, currency)}
+          <div className="card-header" style={{ marginBottom: 20 }}>
+            <div className="card-title">잔액</div>
+            <div className="card-subtitle">이번 달</div>
             </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              <span>🇺🇸</span>
-              <span style={{ color: 'var(--text-secondary)' }}>USD</span>
-            </div>
+          <div className="balance-info">
+            <div className="balance-label">현재 잔액</div>
+            <div className="balance-amount">{formatCurrency(stats.balance, currency)}</div>
+            <div className="balance-currency">KRW</div>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button className="balance-btn">Transfer</button>
-            <button className="balance-btn">Request</button>
-            <button className="balance-btn">Swap</button>
+          <div className="balance-actions">
+            <button className="balance-btn" onClick={() => onNavigate('transactions')}>입출금</button>
+            <button className="balance-btn" onClick={() => onNavigate('accounts')}>계좌 관리</button>
+            <button className="balance-btn" onClick={() => onNavigate('budgets')}>예산 보기</button>
           </div>
         </div>
 
         <div className="card earnings-chart-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Earnings Report</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Expense Report</span>
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-tertiary)' }}>1 Year</span>
-          </div>
+            </div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barGap={4}>
+              <BarChart data={chartData} barGap={4} margin={{ left: -10, right: 10 }} barCategoryGap={10}>
+                <defs>
+                  <linearGradient id="dashboardExpenseGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#cfd2d7" />
+                    <stop offset="100%" stopColor="#4b5563" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
                 <XAxis 
                   dataKey="day" 
@@ -402,48 +417,60 @@ const DashboardView: React.FC<{
                   axisLine={false} 
                   tickLine={false} 
                   tick={{ fontSize: 11, fill: axisColor, fontWeight: 500 }} 
-                  tickFormatter={(v) => `$${(v/1000).toFixed(0)}K`} 
+                  tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} 
                 />
-                <Tooltip />
-                <Bar dataKey="수입" fill="#5B6CF7" radius={[4, 4, 0, 0]} />
+                <Tooltip
+                  cursor={false}
+                  contentStyle={{
+                    background: 'rgba(20,20,22,0.92)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 12,
+                    color: '#f8fafc',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.65)',
+                    padding: '10px 14px',
+                  }}
+                  labelStyle={{ color: '#e5e7eb', fontWeight: 700 }}
+                  formatter={(value: number) => formatCurrency(value, currency)}
+                />
+                <Bar dataKey="지출" fill="url(#dashboardExpenseGradient)" radius={[6, 6, 0, 0]} activeBar={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </div>
         </div>
-      </div>
 
       {/* Second Row: Metrics + Currencies + Transactions */}
       <div className="dashboard-row-2">
         <div className="metrics-grid">
           <div className="card metric-card-small">
             <div className="metric-title">Total Earnings</div>
-            <div className="metric-value">{formatCurrency(stats.income * 0.42, currency)}</div>
+            <div className="metric-value">{formatCurrency(totalIncome, currency)}</div>
             <div className="metric-change positive">+6% This week</div>
-          </div>
+            </div>
           <div className="card metric-card-small metric-spending">
             <div className="metric-title">Total Spending</div>
-            <div className="metric-value">{formatCurrency(stats.expense * 0.35, currency)}</div>
+            <div className="metric-value">{formatCurrency(totalExpense, currency)}</div>
             <div className="metric-change negative">-16% This week</div>
           </div>
           <div className="card metric-card-small">
-            <div className="metric-title">Total Income</div>
-            <div className="metric-value">{formatCurrency(stats.income * 0.28, currency)}</div>
+            <div className="metric-title">Net Balance</div>
+            <div className="metric-value">{formatCurrency(netRevenue, currency)}</div>
             <div className="metric-change positive">+2% This week</div>
           </div>
           <div className="card metric-card-small">
-            <div className="metric-title">Total Revenue</div>
-            <div className="metric-value">{formatCurrency(stats.income * 1.42, currency)}</div>
+            <div className="metric-title">Transactions</div>
+            <div className="metric-value">{stats.transactionCount.toLocaleString()} 건</div>
             <div className="metric-change positive">+60% This year</div>
           </div>
           <div className="card monthly-limit-card">
             <div className="metric-title">Monthly Spending Limit</div>
             <div className="progress-bar-wrapper">
               <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${Math.min(100, (stats.expense / 400000) * 100)}%` }}></div>
+                <div className="progress-fill" style={{ width: totalBudget > 0 ? `${Math.min(100, (stats.expense / totalBudget) * 100)}%` : '0%' }}></div>
               </div>
               <div className="progress-labels">
-                <span>{formatCurrency(stats.expense * 0.4, currency)}</span>
-                <span>{formatCurrency(400000, currency)}</span>
+                <span>{formatCurrency(stats.expense, currency)}</span>
+                <span>{formatCurrency(totalBudget, currency)}</span>
               </div>
             </div>
           </div>
@@ -452,7 +479,7 @@ const DashboardView: React.FC<{
         <div className="card currencies-card">
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 16 }}>
             Highlighted currencies
-          </div>
+            </div>
           <div className="crypto-list">
             {expenseByCategory.slice(0, 5).map((item, idx) => (
               <div key={idx} className="crypto-item">
@@ -460,20 +487,20 @@ const DashboardView: React.FC<{
                 <div className="crypto-info">
                   <div className="crypto-name">{item.name}</div>
                   <div className="crypto-symbol">{item.name.substring(0, 3).toUpperCase()}</div>
-                </div>
+          </div>
                 <div className="crypto-price">
                   <div className="crypto-amount">{formatCurrency(item.value, currency)}</div>
                   <div className="crypto-time">Now</div>
-                </div>
-              </div>
-            ))}
           </div>
+          </div>
+            ))}
+        </div>
         </div>
 
         <div className="card transactions-card">
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 16 }}>
             Last Transactions
-          </div>
+              </div>
           <div className="transactions-list">
             {transactions.slice(0, 6).map((tx) => (
               <div key={tx.id} className="transaction-item">
@@ -481,15 +508,106 @@ const DashboardView: React.FC<{
                 <div className="transaction-info">
                   <div className="transaction-name">{tx.memo || tx.category_name || 'Transaction'}</div>
                   <div className="transaction-detail">{formatDate(tx.date)}</div>
-                </div>
+            </div>
                 <div className={`transaction-amount ${tx.type === 'income' ? 'positive' : 'negative'}`}>
                   {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, currency)}
-                </div>
-              </div>
+          </div>
+            </div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* Third Row: Cards + Goals */}
+      <div className="dashboard-row-3">
+        <div className="card cards-board">
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="card-title">Your cards</div>
+              <div className="card-subtitle">이번 달 카드 현황</div>
+                      </div>
+            <button className="btn btn-sm" onClick={() => onNavigate('accounts')}>Manage</button>
+          </div>
+          <div className="cards-list">
+            {accounts.length > 0 ? (
+              accounts.map((acc) => {
+                const usage = accountUsage[acc.id] || { spent: 0, income: 0 };
+                return (
+                  <div
+                    key={acc.id}
+                    className="bank-card real"
+                  >
+                    <div className="bank-card-top">
+                      <div className="bank-card-brand">{acc.name}</div>
+                      <div className="bank-card-chip">💳</div>
+                      </div>
+                    <div className="bank-card-balance">{formatCurrency(acc.balance, currency)}</div>
+                    <div className="bank-card-bottom">
+                      <div>
+                        <div className="bank-card-label">TYPE</div>
+                        <div className="bank-card-value">{acc.type.toUpperCase()}</div>
+                      </div>
+                      <div>
+                        <div className="bank-card-label">Spending this month</div>
+                        <div className="bank-card-value">{formatCurrency(usage.spent, currency)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="empty-state" style={{ padding: 24, alignItems: 'flex-start' }}>
+                <div className="empty-state-text">등록된 카드가 없습니다.</div>
+                <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => onNavigate('accounts')}>
+                  카드 등록하기
+                </button>
+            </div>
+          )}
+          </div>
+        </div>
+
+        <div className="card goals-board">
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="card-title">My Goals</div>
+              <div className="card-subtitle">목표 진행률</div>
+            </div>
+            <button className="btn btn-sm" onClick={() => onNavigate('savings')}>Add Goals</button>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ fontSize: 13, minWidth: 320 }}>
+              <thead>
+                <tr>
+                  <th>목표</th>
+                  <th style={{ textAlign: 'right' }}>진행률</th>
+                  <th style={{ textAlign: 'right' }}>현재/목표</th>
+                </tr>
+              </thead>
+              <tbody>
+                {savingsGoals.map((goal) => {
+                  const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
+                  return (
+                    <tr key={goal.id}>
+                      <td>{goal.name}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{progress.toFixed(0)}%</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {formatCurrency(goal.current_amount, currency)} / {formatCurrency(goal.target_amount, currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {savingsGoals.length === 0 && (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'center', padding: 16, color: 'var(--text-tertiary)' }}>
+                      저축 목표가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+          </div>
     </>
   );
 };
@@ -510,7 +628,7 @@ const TransactionsView: React.FC<{
   const handleDelete = async (id: string) => {
     if (!window.confirm('이 거래를 삭제할까요?')) return;
     await transactionsApi.delete(id);
-    onRefresh();
+    await onRefresh();
   };
 
   const handleEdit = (transaction: Transaction) => {
@@ -576,14 +694,14 @@ const TransactionsView: React.FC<{
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
+          <div>
           <div className="panel-title">Transactions</div>
           <div className="panel-sub">{month} · {transactions.length} entries</div>
-        </div>
+            </div>
         <button className="btn btn-primary" onClick={() => { setEditingTransaction(null); setShowForm(true); }}>
           <Icons.Plus /> New Transaction
         </button>
-      </div>
+        </div>
 
       <div className="panel" style={{ gridTemplateColumns: '2fr 1fr' }}>
         <div className="panel-main">
@@ -605,14 +723,14 @@ const TransactionsView: React.FC<{
                   key={idx}
                   className={`calendar-day ${!day.isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''} ${selectedDate === day.date ? 'selected' : ''}`}
                   onClick={() => day.isCurrentMonth && setSelectedDate(day.date)}
-                >
+          >
                   <div className="calendar-day-number">{day.dayNum}</div>
                   <div className="calendar-transactions">
                     {dayTransactions.slice(0, 3).map((t, i) => (
                       <div key={i} className={`calendar-transaction-item ${t.type}`}>
                         {formatCurrency(t.amount, currency)}
                       </div>
-                    ))}
+            ))}
                     {dayTransactions.length > 3 && (
                       <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>
                         +{dayTransactions.length - 3} more
@@ -639,15 +757,15 @@ const TransactionsView: React.FC<{
 
           {selectedDayTransactions.length > 0 ? (
             <table className="data-table" style={{ fontSize: 13 }}>
-              <thead>
-                <tr>
+          <thead>
+            <tr>
                   <th>Type</th>
                   <th>Category</th>
                   <th style={{ textAlign: 'right' }}>Amount</th>
                   <th style={{ width: 120 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            </tr>
+          </thead>
+          <tbody>
                 {selectedDayTransactions.map((t) => (
                   <tr key={t.id}>
                     <td>
@@ -677,22 +795,22 @@ const TransactionsView: React.FC<{
                           수정
                         </button>
                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>
-                          삭제
-                        </button>
+                        삭제
+                      </button>
                       </div>
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+          </tbody>
+        </table>
           ) : selectedDate ? (
             <div className="empty-state">
               <div className="empty-state-text">No transactions</div>
-            </div>
+      </div>
           ) : (
             <div className="empty-state">
               <div className="empty-state-text">Select a date to view transactions</div>
-            </div>
+          </div>
           )}
         </div>
       </div>
@@ -705,10 +823,10 @@ const TransactionsView: React.FC<{
           editingTransaction={editingTransaction}
           onClose={() => { setShowForm(false); setEditingTransaction(null); }}
           onSave={() => {
-            setShowForm(false);
-            setEditingTransaction(null);
-            onRefresh();
-          }}
+          setShowForm(false);
+          setEditingTransaction(null);
+          onRefresh();
+        }}
         />
       )}
     </>
@@ -771,13 +889,13 @@ const TransactionFormModal: React.FC<{
     try {
       if (editingTransaction) {
         await transactionsApi.update(editingTransaction.id, {
-          date,
-          type,
+      date,
+      type,
           account_id: accountId,
           category_id: categoryId,
-          amount: value,
+      amount: value,
           memo: memo.trim() || null,
-        });
+    });
       } else {
         await transactionsApi.create({
           date,
@@ -793,8 +911,8 @@ const TransactionFormModal: React.FC<{
     } catch {
       alert('저장에 실패했습니다.');
     } finally {
-      setSaving(false);
-    }
+    setSaving(false);
+  }
   };
 
   return (
@@ -804,7 +922,7 @@ const TransactionFormModal: React.FC<{
           <div>
             <div className="panel-title">{editingTransaction ? 'Edit Transaction' : 'New Transaction'}</div>
             <div className="panel-sub">{editingTransaction ? 'Update transaction details' : 'Enter transaction details'}</div>
-          </div>
+            </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
             <Icons.Close />
           </button>
@@ -914,37 +1032,46 @@ const BudgetsView: React.FC<{
   stats: MonthlyStats | null;
   currency: string;
   month: string;
+  transactions: Transaction[];
   onRefresh: () => void;
-}> = ({ budgets, categories, stats, currency, month, onRefresh }) => {
+}> = ({ budgets, categories, stats, currency, month, transactions, onRefresh }) => {
   const expenseCategories = useMemo(() => 
     categories.filter((c) => c.type === 'expense'),
     [categories]
   );
 
+  const [showModal, setShowModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [categoryId, setCategoryId] = useState(() => expenseCategories[0]?.id ?? '');
   const [amount, setAmount] = useState('');
 
-  const handleAddBudget = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditingBudget(null);
+    setCategoryId(expenseCategories[0]?.id ?? '');
+    setAmount('');
+    setShowModal(true);
+  };
+
+  const openEdit = (budget: Budget) => {
+    setEditingBudget(budget);
+    setCategoryId(budget.category_id);
+    setAmount(String(budget.amount));
+    setShowModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = Number(amount.replace(/,/g, ''));
     if (!value || value <= 0) {
       alert('예산 금액을 입력해주세요.');
       return;
     }
-    
-    // 중복 체크
-    const existing = budgets.find(b => b.category_id === categoryId);
-    if (existing) {
-      alert('이미 해당 카테고리의 예산이 등록되어 있습니다. 수정 버튼을 사용해주세요.');
-      return;
-    }
-    
     try {
       await budgetsApi.create({
         category_id: categoryId,
         amount: value,
       });
-      setAmount('');
+      setShowModal(false);
       await onRefresh();
     } catch {
       alert('예산 저장에 실패했습니다.');
@@ -961,121 +1088,152 @@ const BudgetsView: React.FC<{
     }
   };
 
+  const expenseTransactions = useMemo(
+    () => transactions.filter((t) => t.type === 'expense'),
+    [transactions]
+  );
+
   return (
-    <div className="panel">
-      <div className="panel-main">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">예산 관리</div>
-            <div className="panel-sub">{month} 카테고리별 예산</div>
+    <>
+      <div className="panel budget-grid">
+        <div className="panel-main budget-half">
+          <div className="panel-header">
+            <div>
+              <div className="panel-title">예산 관리</div>
+              <div className="panel-sub">{month} 카테고리별 예산</div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={openCreate}>예산 추가</button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table glass-table" style={{ minWidth: 680 }}>
+              <thead>
+                <tr>
+                  <th>카테고리</th>
+                  <th style={{ textAlign: 'right' }}>예산</th>
+                  <th style={{ textAlign: 'right' }}>사용액</th>
+                  <th style={{ textAlign: 'right' }}>잔액</th>
+                  <th style={{ textAlign: 'center', width: 120 }}>작업</th>
+                </tr>
+              </thead>
+              <tbody>
+                {budgets.map((budget) => {
+                  const spent = stats?.budgetUsage.find(b => b.id === budget.id)?.spent ?? 0;
+                  const remaining = Math.max(0, budget.amount - spent);
+                  return (
+                    <tr key={budget.id}>
+                      <td>{budget.category_name}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(budget.amount, currency)}</td>
+                      <td style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700 }}>{formatCurrency(spent, currency)}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 700 }}>{formatCurrency(remaining, currency)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button className="btn btn-sm" onClick={() => openEdit(budget)}>수정</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {budgets.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>
+                      예산이 없습니다. 추가 버튼을 눌러 등록하세요.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {budgets.length > 0 ? (
-          <div>
-            {budgets.map((budget) => {
-              const spent = stats?.budgetUsage.find(b => b.id === budget.id)?.spent ?? 0;
-              const ratio = budget.amount > 0 ? spent / budget.amount : 0;
-              const pct = Math.min(100, ratio * 100);
-              
-            return (
-                <div key={budget.id} className="budget-row">
-                <div className="budget-info">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <div className="budget-label">{budget.category_name}</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <span style={{ 
-                          fontSize: 13, 
-                          fontWeight: 600,
-                          color: ratio > 1 ? '#FF3B30' : ratio > 0.8 ? '#FF9500' : '#34C759'
-                        }}>
-                          {(ratio * 100).toFixed(0)}%
-                        </span>
-                        <button 
-                          className="btn btn-sm" 
-                          onClick={() => {
-                            const newAmount = window.prompt('새 예산 금액을 입력하세요:', String(budget.amount));
-                            if (newAmount && Number(newAmount) > 0) {
-                              budgetsApi.create({
-                                category_id: budget.category_id,
-                                amount: Number(newAmount)
-                              }).then(() => onRefresh());
-                            }
-                          }}
-                        >
-                          수정
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-danger" 
-                          onClick={() => handleDeleteBudget(budget.id)}
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  <div className="progress-track">
-                    <div
-                        className={`progress-fill ${ratio > 1 ? 'over' : ratio > 0.8 ? '' : 'success'}`}
-                        style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="budget-amounts">
-                      <span>{formatCurrency(spent, currency)}</span>
-                      <span> / {formatCurrency(budget.amount, currency)}</span>
-                      <span style={{ marginLeft: 'auto', color: 'var(--text-tertiary)' }}>
-                        남은 금액: {formatCurrency(Math.max(0, budget.amount - spent), currency)}
-                      </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">📈</div>
-            <div className="empty-state-title">예산이 없습니다</div>
-            <div className="empty-state-text">카테고리별 예산을 설정해보세요</div>
+        <div className="panel-side budget-half">
+          <div className="panel-header">
+            <div>
+              <div className="panel-title">지출 내역</div>
+              <div className="panel-sub">Reports 하단 테이블을 예산 화면에 배치했습니다</div>
+            </div>
           </div>
-        )}
-      </div>
-
-      <div className="panel-side">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">예산 추가</div>
-            <div className="panel-sub">같은 카테고리는 덮어씌워집니다</div>
-          </div>
-        </div>
-
-        <form className="form" onSubmit={handleAddBudget}>
-          <div className="form-group">
-            <label className="form-label">카테고리</label>
-            <select
-              className="form-select"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              {expenseCategories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table glass-table" style={{ fontSize: 13, minWidth: 760 }}>
+              <thead>
+                <tr>
+                  <th>날짜</th>
+                  <th>Type</th>
+                  <th>카테고리</th>
+                  <th style={{ textAlign: 'right' }}>금액</th>
+                  <th>Account</th>
+                  <th>Memo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenseTransactions.map((t) => (
+                  <tr key={t.id}>
+                    <td>{formatDate(t.date)}</td>
+                    <td>{t.type.toUpperCase()}</td>
+                    <td>{t.category_name}</td>
+                    <td style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700 }}>{formatCurrency(t.amount, currency)}</td>
+                    <td>{t.account_name || '-'}</td>
+                    <td>{t.memo || '-'}</td>
+                  </tr>
                 ))}
-            </select>
+                {expenseTransactions.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>
+                      지출 내역이 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="form-group">
-            <label className="form-label">예산 금액</label>
-            <input
-              className="form-input"
-              placeholder="예: 300,000"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary">
-            저장
-          </button>
-        </form>
+        </div>
       </div>
-    </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
+          <div className="modal-content" style={{ maxWidth: 460 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div className="panel-title">{editingBudget ? '예산 수정' : '예산 추가'}</div>
+                <div className="panel-sub">같은 카테고리는 덮어씌워집니다</div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}>
+                <Icons.Close />
+              </button>
+            </div>
+
+            <form className="form" onSubmit={handleSave}>
+              <div className="form-group">
+                <label className="form-label">카테고리</label>
+                <select
+                  className="form-select"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                >
+                  {expenseCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">예산 금액</label>
+                <input
+                  className="form-input"
+                  placeholder="예: 300,000"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>취소</button>
+                <button type="submit" className="btn btn-primary">저장</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -1148,6 +1306,18 @@ const CategoriesView: React.FC<{
     categories.filter((c) => c.type === 'expense'),
     [categories]
   );
+  const expenseTree = useMemo(() => {
+    const parents = expenseCategories.filter((c) => !c.parent_id);
+    const children = expenseCategories.filter((c) => c.parent_id);
+    const grouped = parents.map((parent) => ({
+      parent,
+      children: children.filter((c) => c.parent_id === parent.id),
+    }));
+    const orphans = children.filter(
+      (child) => !parents.some((p) => p.id === child.parent_id)
+    );
+    return { grouped, orphans };
+  }, [expenseCategories]);
 
   return (
     <>
@@ -1167,12 +1337,91 @@ const CategoriesView: React.FC<{
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
-      <CategoryList 
-        items={expenseCategories} 
-        title="지출 카테고리"
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      <div className="panel-main" style={{ marginBottom: 20 }}>
+        <div className="panel-header">
+          <div>
+            <div className="panel-title">지출 카테고리</div>
+            <div className="panel-sub">대분류와 소분류를 테이블로 구분해 보여줍니다</div>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table glass-table" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>대분류</th>
+                <th>소분류</th>
+                <th>구분</th>
+                <th style={{ width: 160, textAlign: 'center' }}>작업</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenseTree.grouped.map(({ parent, children }) => (
+                <React.Fragment key={parent.id}>
+                  <tr className="category-parent-row">
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="color-dot" style={{ background: parent.color }} />
+                        <span>{parent.name}</span>
+                      </div>
+                    </td>
+                    <td style={{ color: 'var(--text-tertiary)' }}>-</td>
+                    <td>대분류</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button className="btn btn-sm" onClick={() => handleEdit(parent)}>수정</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>삭제</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {children.map((child) => (
+                    <tr key={child.id} className="category-child-row">
+                      <td style={{ color: 'var(--text-tertiary)' }}>{parent.name}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="color-dot" style={{ background: child.color }} />
+                          <span>{child.name}</span>
+                        </div>
+                      </td>
+                      <td>소분류</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))}
+              {expenseTree.orphans.map((child) => (
+                <tr key={child.id} className="category-child-row">
+                  <td style={{ color: 'var(--text-tertiary)' }}>미분류</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="color-dot" style={{ background: child.color }} />
+                      <span>{child.name}</span>
+                    </div>
+                  </td>
+                  <td>소분류</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                      <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {expenseCategories.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--text-tertiary)' }}>
+                    지출 카테고리가 없습니다. 상단 버튼으로 추가하세요.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {showForm && (
         <CategoryFormModal
@@ -1278,8 +1527,8 @@ const CategoryFormModal: React.FC<{
               onChange={(e) => {
                 setType(e.target.value as 'income' | 'expense');
                 setParentId('');
-              }}
-            >
+                }}
+              >
               <option value="expense">지출</option>
               <option value="income">수입</option>
             </select>
@@ -1331,9 +1580,9 @@ const CategoryFormModal: React.FC<{
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
+              </div>
+            </div>
+          );
 };
 
 // ========== Accounts View ==========
@@ -1540,28 +1789,38 @@ const AccountFormModal: React.FC<{
 // ========== Reports View ==========
 const ReportsView: React.FC<{
   stats: MonthlyStats | null;
-  transactions: Transaction[];
-  categories: Category[];
   currency: string;
-  month: string;
-  theme: 'light' | 'dark';
-}> = ({ stats, currency, theme }) => {
+}> = ({ stats, currency }) => {
+  const expenseByCategory = stats?.byCategory
+    .filter((c) => c.type === 'expense')
+    .sort((a, b) => b.total - a.total) ?? [];
+
+  const lineData = useMemo(() => {
+    if (!stats) return [];
+    const daysInMonth = new Date(Number(stats.month.split('-')[0]), Number(stats.month.split('-')[1]), 0).getDate();
+    const data: Array<{ day: number; income: number; expense: number }> = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dateStr = `${stats.month}-${String(i).padStart(2, '0')}`;
+      const inc = stats.dailyTrend.filter(d => d.date === dateStr && d.type === 'income').reduce((s, d) => s + d.total, 0);
+      const exp = stats.dailyTrend.filter(d => d.date === dateStr && d.type === 'expense').reduce((s, d) => s + d.total, 0);
+      data.push({ day: i, income: inc, expense: exp });
+    }
+    return data;
+  }, [stats]);
+
+  const axisColor = '#d4d4d8';
+  const gridColor = 'rgba(255,255,255,0.12)';
+  const tooltipBg = 'rgba(20, 20, 22, 0.92)';
+  const tooltipBorder = 'rgba(255,255,255,0.08)';
+  const tooltipLabel = '#f4f4f5';
+  const tooltipText = '#e5e7eb';
+  const incomeColor = '#5B6CF7';
+  const expenseColor = '#39D353';
+
   if (!stats) return <div className="loading-spinner" />;
 
-  const expenseByCategory = stats.byCategory
-    .filter((c) => c.type === 'expense')
-    .sort((a, b) => b.total - a.total);
-
-  const isDark = theme === 'dark';
-  const axisColor = isDark ? '#d4d4d8' : '#999999';
-  const gridColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-  const tooltipBg = isDark ? 'rgba(15, 15, 20, 0.95)' : '#FFFFFF';
-  const tooltipBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-  const tooltipLabel = isDark ? '#f4f4f5' : '#000000';
-  const tooltipText = isDark ? '#e5e7eb' : '#111827';
-
   return (
-    <>
+    <div className="reports-stack">
       <div className="card-grid card-grid-3">
         <div className="card">
           <div className="card-title">총 거래 건수</div>
@@ -1586,39 +1845,87 @@ const ReportsView: React.FC<{
         </div>
       </div>
 
-      <div className="panel">
-    <div className="panel-main">
-      <div className="panel-header">
-        <div>
-              <div className="panel-title">지출 카테고리 분석</div>
-              <div className="panel-sub">카테고리별 지출 비율</div>
+      <div className="reports-chart-grid">
+        <div className="card" style={{ padding: 24 }}>
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="card-title">Activity Summary</div>
+              <div className="card-subtitle">수입/지출 추이</div>
+            </div>
           </div>
-        </div>
-
-          <div style={{ height: 340 }}>
+          <div style={{ height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={expenseByCategory} layout="vertical" margin={{ left: 20, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={true} vertical={false} />
-                <XAxis 
-                  type="number" 
-                  tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`}
+              <LineChart data={lineData} margin={{ left: -10, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis
+                  dataKey="day"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
                 />
-                <YAxis 
-                  type="category" 
-                  dataKey="category_name" 
-                  width={100} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: axisColor, fontWeight: 500 }}
+                  tickFormatter={(v) => `${(v/10000).toFixed(0)}만`}
+                />
+                <Tooltip
+                  cursor={{ stroke: 'rgba(255,255,255,0.12)' }}
+                  contentStyle={{
+                    background: tooltipBg,
+                    border: `1px solid ${tooltipBorder}`,
+                    borderRadius: 12,
+                    color: tooltipText,
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.65)',
+                    padding: '10px 14px',
+                  }}
+                  labelStyle={{ color: tooltipLabel, fontWeight: 700 }}
+                  formatter={(value: number) => formatCurrency(value, currency)}
+                />
+                <Line type="monotone" dataKey="income" stroke={incomeColor} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="expense" stroke={expenseColor} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: 24 }}>
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="card-title">지출 카테고리 분석</div>
+              <div className="card-subtitle">카테고리별 지출</div>
+            </div>
+          </div>
+          <div style={{ height: 320 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={expenseByCategory.slice(0, 10)} layout="vertical" margin={{ left: 12, right: 12 }}>
+                <defs>
+                  <linearGradient id="reportsCategoryGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#d1d5db" />
+                    <stop offset="100%" stopColor="#4b5563" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal vertical={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v) => `${(v/10000).toFixed(0)}만`}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="category_name"
+                  width={120}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 13, fontWeight: 600, fill: axisColor }}
                 />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => formatCurrency(value, currency)}
                   contentStyle={{
                     borderRadius: 8,
-                    boxShadow: isDark ? '0 12px 32px rgba(0,0,0,0.6)' : '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
                     padding: '12px 16px',
                     background: tooltipBg,
                     border: `1px solid ${tooltipBorder}`,
@@ -1626,69 +1933,13 @@ const ReportsView: React.FC<{
                   }}
                   labelStyle={{ color: tooltipLabel, fontWeight: 600, marginBottom: 8 }}
                 />
-                <Bar dataKey="total" radius={[0, 6, 6, 0]}>
-                  {expenseByCategory.map((_, index) => (
-                    <Cell key={index} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
-                  ))}
-                </Bar>
+                <Bar dataKey="total" radius={[0, 6, 6, 0]} fill="url(#reportsCategoryGradient)" />
               </BarChart>
             </ResponsiveContainer>
-      </div>
-    </div>
-
-    <div className="panel-side">
-      <div className="panel-header">
-        <div>
-          <div className="panel-title">지출 내역</div>
-          <div className="panel-sub">상위 10개 지출</div>
+          </div>
         </div>
       </div>
-
-      {expenseByCategory.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table" style={{ fontSize: 13 }}>
-            <thead>
-              <tr>
-                <th>카테고리</th>
-                <th style={{ textAlign: 'right' }}>금액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenseByCategory.slice(0, 10).map((item) => (
-                <tr key={item.category_id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: item.category_color,
-                        flexShrink: 0
-                      }} />
-                      <span style={{ fontWeight: 500 }}>{item.category_name}</span>
-                    </div>
-                  </td>
-                  <td style={{ 
-                    textAlign: 'right', 
-                    fontWeight: 700,
-                    color: 'var(--danger)',
-                    fontFeatureSettings: '"tnum"'
-                  }}>
-                    {formatCurrency(item.total, currency)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="empty-state">
-          <div className="empty-state-text">지출 내역이 없습니다</div>
-        </div>
-      )}
     </div>
-  </div>
-    </>
   );
 };
 
@@ -1719,35 +1970,38 @@ const SavingsView: React.FC<{
       </div>
 
       {goals.length > 0 ? (
-        <div className="card-grid card-grid-3">
-          {goals.map((goal) => {
-            const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
-            return (
-              <div key={goal.id} className="goal-card">
-                <div className="goal-header">
-                  <div className="goal-icon" style={{ background: 'rgba(31,41,55,0.95)', color: '#E5E7EB' }}>
-                    <span style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>GOAL</span>
-                  </div>
-                  <span className="card-trend">{progress.toFixed(0)}%</span>
-                </div>
-                <div className="goal-name">{goal.name}</div>
-                <div className="goal-amounts">
-                  <span className="goal-current">{formatCurrency(goal.current_amount, currency)}</span>
-                  <span>/ {formatCurrency(goal.target_amount, currency)}</span>
-                </div>
-                <div className="progress-track">
-                  <div className="progress-fill success" style={{ width: `${Math.min(100, progress)}%` }} />
-                </div>
-                {goal.deadline && (
-                  <div className="goal-deadline">목표일: {formatDate(goal.deadline)}</div>
-                )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <button className="btn btn-sm" style={{ flex: 1 }}>금액 추가</button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
-                </div>
-              </div>
-            );
-          })}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table glass-table goals-table" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>목표</th>
+                <th style={{ textAlign: 'right' }}>진행률</th>
+                <th style={{ textAlign: 'right' }}>현재 금액</th>
+                <th style={{ textAlign: 'right' }}>목표 금액</th>
+                <th>기한</th>
+                <th style={{ textAlign: 'center', width: 120 }}>작업</th>
+              </tr>
+            </thead>
+            <tbody>
+              {goals.map((goal) => {
+                const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
+                return (
+                  <tr key={goal.id}>
+                    <td>{goal.name}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{progress.toFixed(0)}%</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(goal.current_amount, currency)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(goal.target_amount, currency)}</td>
+                    <td>{goal.deadline ? formatDate(goal.deadline) : '-'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="empty-state" style={{ borderRadius: 20, padding: 60 }}>
@@ -2177,114 +2431,6 @@ const RecurringFormModal: React.FC<{
   );
 };
 
-// ========== Settings View ==========
-const SettingsView: React.FC<{
-  currency: string;
-  setCurrency: (c: string) => void;
-  theme: 'light' | 'dark';
-  setTheme: (t: 'light' | 'dark') => void;
-}> = ({ currency, setCurrency, theme, setTheme }) => {
-  const [localCurrency, setLocalCurrency] = useState(currency);
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await userApi.update({ currency: localCurrency });
-      setCurrency(localCurrency);
-      alert('설정이 저장되었습니다.');
-    } catch {
-      alert('저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="panel" style={{ gridTemplateColumns: '1fr 1fr' }}>
-      <div className="panel-main">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">일반 설정</div>
-            <div className="panel-sub">앱 기본 설정을 관리합니다</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div className="form-group">
-            <label className="form-label">테마</label>
-            <div 
-              className="theme-toggle" 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            >
-              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                {theme === 'light' ? '라이트 모드' : '다크 모드'}
-              </span>
-              <div className={`theme-toggle-switch ${theme === 'dark' ? 'active' : ''}`}>
-                <div className="theme-toggle-thumb" />
-              </div>
-            </div>
-          </div>
-
-          <form className="form" onSubmit={handleSave}>
-            <div className="form-group" style={{ maxWidth: 200 }}>
-              <label className="form-label">통화 단위</label>
-              <select
-                className="form-select"
-                value={localCurrency}
-                onChange={(e) => setLocalCurrency(e.target.value)}
-              >
-                <option value="₩">₩ 원 (KRW)</option>
-                <option value="$">$ 달러 (USD)</option>
-                <option value="€">€ 유로 (EUR)</option>
-                <option value="¥">¥ 엔 (JPY)</option>
-              </select>
-            </div>
-
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '저장 중...' : '저장'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ marginTop: 40 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>데이터 관리</h3>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button className="btn">데이터 내보내기</button>
-            <button className="btn">데이터 가져오기</button>
-            <button className="btn btn-danger">모든 데이터 삭제</button>
-          </div>
-        </div>
-      </div>
-
-      <div className="panel-side">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">정보</div>
-            <div className="panel-sub">앱 정보</div>
-          </div>
-        </div>
-        
-        <div className="settings-list">
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>버전</div>
-            <div style={{ color: 'var(--text-tertiary)' }}>1.0.0</div>
-        </div>
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>개발</div>
-            <div style={{ color: 'var(--text-tertiary)' }}>Premium Finance App</div>
-      </div>
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>저장 방식</div>
-            <div style={{ color: 'var(--text-tertiary)' }}>SQLite Database</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ========== Profile View ==========
 const ProfileView: React.FC = () => {
   return (
@@ -2346,7 +2492,7 @@ const ProfileView: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+);
 };
 
 export default App;
