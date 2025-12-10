@@ -16,53 +16,9 @@ const DEMO_USER_ID = 'demo-user';
 
 app.get('/api/transactions', (req, res) => {
   const { month, type, category_id } = req.query;
-  
-  // Auto-generate transactions from recurring payments for the requested month
+  // Cleanup any legacy auto-generated recurring transactions and skip auto-generation
   if (month) {
-    const recurringPayments = db.prepare(`
-      SELECT * FROM recurring_payments 
-      WHERE user_id = ? AND is_active = 1
-    `).all(DEMO_USER_ID) as any[];
-    
-    for (const payment of recurringPayments) {
-      const startDate = new Date(payment.next_billing_date);
-      const [year, monthNum] = (month as string).split('-').map(Number);
-      
-      // Calculate if this payment should occur in the requested month
-      let shouldGenerate = false;
-      let transactionDate = '';
-      
-      if (payment.cycle === 'monthly') {
-        // Check if start date is before or in this month
-        if (startDate <= new Date(year, monthNum, 0)) {
-          // Generate transaction for this month
-          const day = startDate.getDate();
-          transactionDate = `${year}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          shouldGenerate = true;
-        }
-      }
-      
-      if (shouldGenerate) {
-        // Check if transaction already exists
-        const existing = db.prepare(`
-          SELECT id FROM transactions 
-          WHERE user_id = ? 
-          AND category_id = ? 
-          AND amount = ? 
-          AND date = ?
-          AND memo LIKE ?
-        `).get(DEMO_USER_ID, payment.category_id, payment.amount, transactionDate, `%${payment.name}%`);
-        
-        if (!existing) {
-          // Create transaction
-          const txId = uuidv4();
-          db.prepare(`
-            INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
-            VALUES (?, ?, 'expense', ?, ?, ?, ?, ?)
-          `).run(txId, DEMO_USER_ID, payment.amount, payment.category_id, payment.account_id, transactionDate, `[자동] ${payment.name}`);
-        }
-      }
-    }
+    db.prepare(`DELETE FROM transactions WHERE user_id = ? AND memo LIKE '[자동] %'`).run(DEMO_USER_ID);
   }
   
   let query = `
@@ -72,19 +28,19 @@ app.get('/api/transactions', (req, res) => {
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.user_id = ?
   `;
-  const params: any[] = [DEMO_USER_ID];
+  const params: (string | number)[] = [DEMO_USER_ID];
   
   if (month) {
     query += ` AND strftime('%Y-%m', t.date) = ?`;
-    params.push(month);
+    params.push(String(month));
   }
   if (type && type !== 'all') {
     query += ` AND t.type = ?`;
-    params.push(type);
+    params.push(String(type));
   }
   if (category_id && category_id !== 'all') {
     query += ` AND t.category_id = ?`;
-    params.push(category_id);
+    params.push(String(category_id));
   }
   
   query += ` ORDER BY t.date DESC, t.created_at DESC`;
@@ -232,7 +188,7 @@ app.get('/api/budgets', (req, res) => {
     LEFT JOIN categories c ON b.category_id = c.id
     WHERE b.user_id = ? AND b.month = 'permanent'
   `;
-  const params: any[] = [DEMO_USER_ID];
+  const params: (string | number)[] = [DEMO_USER_ID];
   
   query += ` ORDER BY c.name`;
   

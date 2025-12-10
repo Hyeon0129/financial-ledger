@@ -437,22 +437,13 @@ const DashboardView: React.FC<{
       {/* First Row: Balance + Earnings Report */}
       <div className="dashboard-row">
         <div className="card balance-card">
-          <div className="balance-top">
-            <div className="balance-headings">
-              <div className="balance-tag">이번 달</div>
-              <div className="balance-title">이번 달 수입</div>
-              <div className="balance-figure">{formatCurrency(totalIncome, currency)}</div>
-              <div className="balance-subtext">KRW 기준</div>
-            </div>
-            <div className="balance-mini-chart" aria-hidden="true">
-              <span className="mini-bar mini-bar--muted" />
-              <span className="mini-bar mini-bar--muted" />
-              <span className="mini-bar mini-bar--muted" />
-              <span className="mini-bar mini-bar--active" />
-            </div>
+          <div className="balance-hero">
+            <div className="balance-kicker">이번 달</div>
+            <div className="balance-hero-amount">{formatCurrency(stats.balance, currency)}</div>
+            <div className="balance-hero-sub">KRW 기준</div>
           </div>
 
-          <div className="balance-breakdown">
+          <div className="balance-breakdown sleek">
             <div className="balance-row">
               <div className="balance-row-label">이번 달 수입</div>
               <div className="balance-row-value positive">{formatCurrency(totalIncome, currency)}</div>
@@ -574,7 +565,7 @@ const DashboardView: React.FC<{
           </div>
           <div className="transactions-table-lite">
             <div className="tx-row tx-head">
-              <div className="tx-main tx-col-label">Label</div>
+              <div className="tx-main tx-col-label">CATEGORYㅣ거ㄹ</div>
               <div className="tx-amount-head tx-col-amount">Amount</div>
               <div className="tx-progress-head tx-col-progress">Progress</div>
             </div>
@@ -734,12 +725,25 @@ const DashboardView: React.FC<{
                     <div className="tx-main">
                       <div className="tx-main-text">
                         <div className="tx-name">{goal.name}</div>
-                        <div className="tx-account">Goal</div>
                       </div>
                     </div>
-                    <div className="tx-date">{progress.toFixed(0)}%</div>
-                    <div className="tx-amount negative">
-                      {formatCurrency(goal.current_amount, currency)} / {formatCurrency(goal.target_amount, currency)}
+                    <div className="tx-date">
+  <div className="goal-progress-cell">
+    <div className="goal-progress-bar">
+      <div
+        className="goal-progress-fill"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+    <span className="goal-progress-text">
+      {progress.toFixed(0)}%
+    </span>
+  </div>
+</div>
+                    <div className="tx-amount goal-amount">
+                      <span className="goal-current">{formatCurrency(goal.current_amount, currency)}</span>
+                      <span className="goal-sep"> / </span>
+                      <span className="goal-target">{formatCurrency(goal.target_amount, currency)}</span>
                     </div>
                   </div>
                 );
