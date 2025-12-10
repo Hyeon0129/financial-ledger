@@ -75,6 +75,15 @@ const App: React.FC = () => {
     return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
   }, [month]);
 
+  const normalizeTransactions = useCallback((txs: Transaction[]) => {
+    const uniqMap: Record<string, Transaction> = {};
+    txs.forEach((t) => {
+      if (!uniqMap[t.id]) uniqMap[t.id] = t;
+      else uniqMap[t.id] = t; // overwrite with latest
+    });
+    return Object.values(uniqMap).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }, []);
+
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
@@ -111,7 +120,7 @@ const App: React.FC = () => {
           budgetsApi.list(),
           statsApi.monthly(month),
         ]);
-        setTransactions(txs);
+        setTransactions(normalizeTransactions(txs));
         setBudgets(bds);
         setStats(monthStats);
       } catch (error) {
@@ -119,15 +128,15 @@ const App: React.FC = () => {
       }
     };
     loadMonthData();
-  }, [month]);
+  }, [month, normalizeTransactions]);
 
   // Refresh functions
   const refreshTransactions = useCallback(async () => {
     const txs = await transactionsApi.list({ month });
-    setTransactions(txs);
+    setTransactions(normalizeTransactions(txs));
     const monthStats = await statsApi.monthly(month);
     setStats(monthStats);
-  }, [month]);
+  }, [month, normalizeTransactions]);
 
   const refreshBudgets = useCallback(async () => {
     const bds = await budgetsApi.list();
@@ -337,7 +346,6 @@ const DashboardView: React.FC<{
   const totalExpense = stats?.expense ?? 0;
   const netRevenue = stats ? stats.balance : 0;
   const totalBudget = budgets.reduce((sum: number, b: Budget) => sum + b.amount, 0);
-  
   // Daily trend chart data
   const chartData = useMemo(() => {
     if (!stats) return [];
@@ -373,8 +381,23 @@ const DashboardView: React.FC<{
       .map(c => ({
         name: c.category_name,
         value: c.total,
+        type: c.type,
+        category_id: c.category_id,
+        color: c.category_color,
       }));
   }, [stats]);
+
+  // Fallback spent by category (current month)
+  const expenseSpentMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        const key = t.category_id || 'unknown';
+        map[key] = (map[key] || 0) + t.amount;
+      });
+    return map;
+  }, [transactions]);
 
   const accountUsage = useMemo(() => {
     const map: Record<string, { spent: number; income: number }> = {};
@@ -386,6 +409,7 @@ const DashboardView: React.FC<{
     });
     return map;
   }, [transactions]);
+
 
   const [cardPage, setCardPage] = useState(0);
   const cardsPerPage = 3;
@@ -541,44 +565,91 @@ const DashboardView: React.FC<{
           </div>
         </div>
 
-        <div className="card currencies-card">
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Highlighted currencies
+        <div className="currencies-card">
+          <div className="transactions-header">
+            <div>
+              <div className="transactions-title">Highlighted currencies</div>
+              <div className="transactions-sub">상위 5 카테고리</div>
             </div>
-          <div className="crypto-list">
-            {expenseByCategory.slice(0, 5).map((item, idx) => (
-              <div key={idx} className="crypto-item">
-                <div className="crypto-icon">{item.name.charAt(0)}</div>
-                <div className="crypto-info">
-                  <div className="crypto-name">{item.name}</div>
-                  <div className="crypto-symbol">{item.name.substring(0, 3).toUpperCase()}</div>
           </div>
-                <div className="crypto-price">
-                  <div className="crypto-amount">{formatCurrency(item.value, currency)}</div>
-                  <div className="crypto-time">Now</div>
+          <div className="transactions-table-lite">
+            <div className="tx-row tx-head">
+              <div className="tx-main tx-col-label">Label</div>
+              <div className="tx-amount-head tx-col-amount">Amount</div>
+              <div className="tx-progress-head tx-col-progress">Progress</div>
+            </div>
+            {expenseByCategory.slice(0, 6).map((item, idx) => {
+              const title = item.name;
+              const budgetEntry = stats?.budgetUsage.find((b) => b.category_id === item.category_id);
+              const fallbackBudget = budgets.find((b) => b.category_id === item.category_id)?.amount ?? 0;
+              const budget = budgetEntry?.budget_amount ?? fallbackBudget;
+              const spent = budgetEntry?.spent ?? expenseSpentMap[item.category_id] ?? item.value;
+              const remaining = Math.max(0, budget - spent);
+              const percent = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+              return (
+                <div key={idx} className="tx-row">
+                  <div className="tx-main tx-col-label">
+                    <span className="tx-dot" style={{ background: item.color || '#60a5fa' }} />
+                    <div className="tx-main-text">
+                      <div className="tx-name">{title}</div>
+                    </div>
+                  </div>
+                  <div className="tx-amount negative tx-col-amount">
+                    -{formatCurrency(item.value, currency)}
+                  </div>
+                  <div className="tx-progress tx-col-progress">
+                    <div className="tx-progress-bar">
+                      <div className="tx-progress-fill" style={{ width: `${percent}%` }} />
+                    </div>
+                    {budget > 0 && (
+                      <div className="tx-progress-text">
+                        {percent.toFixed(0)}% of {formatCurrency(budget, currency)} / {formatCurrency(remaining, currency)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          </div>
-            ))}
-        </div>
         </div>
 
-        <div className="card transactions-card">
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Last Transactions
-              </div>
-          <div className="transactions-list">
-            {transactions.slice(0, 6).map((tx) => (
-              <div key={tx.id} className="transaction-item">
-                <div className="transaction-icon">→</div>
-                <div className="transaction-info">
-                  <div className="transaction-name">{tx.memo || tx.category_name || 'Transaction'}</div>
-                  <div className="transaction-detail">{formatDate(tx.date)}</div>
+        <div className="transactions-card">
+          <div className="transactions-header">
+            <div>
+              <div className="transactions-title">Transaction history</div>
+              <div className="transactions-sub">최근 6건</div>
             </div>
-                <div className={`transaction-amount ${tx.type === 'income' ? 'positive' : 'negative'}`}>
-                  {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, currency)}
+            <button className="transactions-menu" type="button" aria-label="More options">⋯</button>
           </div>
+          <div className="transactions-table-lite">
+            <div className="tx-row tx-head">
+              <div className="tx-main tx-col-label">Category</div>
+              <div className="tx-date-head">Date</div>
+              <div className="tx-amount-head tx-col-amount">Amount</div>
+              <div className="tx-cat-head tx-col-memo">Memo</div>
             </div>
-            ))}
+            {transactions.slice(0, 6).map((tx) => {
+              const title = tx.category_name || 'Category';
+              const memoText = tx.memo && tx.memo.trim().length > 0 ? tx.memo : '-';
+              const dotColor = tx.category_color || '#60a5fa';
+              return (
+                <div key={tx.id} className="tx-row">
+                  <div className="tx-main tx-col-label">
+                    <span className="tx-dot" style={{ background: dotColor }} />
+                    <div className="tx-main-text">
+                      <div className="tx-name">{title}</div>
+                    </div>
+                  </div>
+                  <div className="tx-date">{formatDate(tx.date)}</div>
+                  <div className={`tx-amount ${tx.type === 'income' ? 'positive' : 'negative'} tx-col-amount`}>
+                    {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount, currency)}
+                  </div>
+                  <div className="tx-category tx-col-memo">
+                    <span>{memoText}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -645,45 +716,43 @@ const DashboardView: React.FC<{
           </div>
         </div>
 
-        <div className="card goals-board">
-          <div className="card-header" style={{ marginBottom: 12 }}>
-            <div>
-              <div className="card-title">My Goals</div>
-              <div className="card-subtitle">목표 진행률</div>
+        <div className="goals-board">
+          
+          <div className="transactions-table-lite goals-table-lite">
+            <div className="tx-row tx-head">
+              <div className="tx-main tx-col-label">Goal</div>
+              <div className="tx-date-head tx-col-progress">Progress</div>
+              <div className="tx-amount-head tx-col-amount">
+                <span>Current / Target</span>
+              </div>
             </div>
-            <button className="btn btn-sm" onClick={() => onNavigate('savings')}>Add Goals</button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ fontSize: 13, minWidth: 320 }}>
-              <thead>
-                <tr>
-                  <th>목표</th>
-                  <th style={{ textAlign: 'right' }}>진행률</th>
-                  <th style={{ textAlign: 'right' }}>현재/목표</th>
-                </tr>
-              </thead>
-              <tbody>
-                {savingsGoals.map((goal) => {
-                  const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
-                  return (
-                    <tr key={goal.id}>
-                      <td>{goal.name}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{progress.toFixed(0)}%</td>
-                      <td style={{ textAlign: 'right' }}>
-                        {formatCurrency(goal.current_amount, currency)} / {formatCurrency(goal.target_amount, currency)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {savingsGoals.length === 0 && (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'center', padding: 16, color: 'var(--text-tertiary)' }}>
-                      저축 목표가 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            {savingsGoals.length > 0 ? (
+              savingsGoals.slice(0, 6).map((goal) => {
+                const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
+                return (
+                  <div key={goal.id} className="tx-row">
+                    <div className="tx-main">
+                      <div className="tx-main-text">
+                        <div className="tx-name">{goal.name}</div>
+                        <div className="tx-account">Goal</div>
+                      </div>
+                    </div>
+                    <div className="tx-date">{progress.toFixed(0)}%</div>
+                    <div className="tx-amount negative">
+                      {formatCurrency(goal.current_amount, currency)} / {formatCurrency(goal.target_amount, currency)}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="tx-row" style={{ justifyContent: 'center' }}>
+                <div className="tx-main" style={{ justifyContent: 'center' }}>
+                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>저축 목표가 없습니다.</div>
+                </div>
+                <div className="tx-date" />
+                <div className="tx-amount" />
+              </div>
+            )}
           </div>
         </div>
           </div>
@@ -967,7 +1036,7 @@ const TransactionFormModal: React.FC<{
     setSaving(true);
     try {
       if (editingTransaction) {
-        await transactionsApi.update(editingTransaction.id, {
+        const updated = await transactionsApi.update(editingTransaction.id, {
       date,
       type,
           account_id: accountId,
@@ -975,6 +1044,14 @@ const TransactionFormModal: React.FC<{
       amount: value,
           memo: memo.trim() || null,
     });
+        // 일부 백엔드에서 update 시 새로운 id로 추가되는 경우가 있어 기존 건 제거
+        if (updated?.id && updated.id !== editingTransaction.id) {
+          try {
+            await transactionsApi.delete(editingTransaction.id);
+          } catch {
+            /* 삭제 실패 시 무시하고 최신 데이터로 이어감 */
+          }
+        }
       } else {
         await transactionsApi.create({
           date,
@@ -1119,6 +1196,17 @@ const BudgetsView: React.FC<{
     [categories]
   );
 
+  const expenseSpentMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions
+      .filter((t) => t.type === 'expense')
+      .forEach((t) => {
+        const key = t.category_id || 'unknown';
+        map[key] = (map[key] || 0) + t.amount;
+      });
+    return map;
+  }, [transactions]);
+
   const [showModal, setShowModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [categoryId, setCategoryId] = useState(() => expenseCategories[0]?.id ?? '');
@@ -1179,7 +1267,7 @@ const BudgetsView: React.FC<{
           <div className="panel-header">
             <div>
               <div className="panel-title">예산 관리</div>
-              <div className="panel-sub">{month} 카테고리별 예산</div>
+              <div className="panel-sub">{month}  예산</div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={openCreate}>예산 추가</button>
           </div>
@@ -1197,7 +1285,7 @@ const BudgetsView: React.FC<{
               </thead>
               <tbody>
                 {budgets.map((budget) => {
-                  const spent = stats?.budgetUsage.find(b => b.id === budget.id)?.spent ?? 0;
+                  const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
                   const remaining = Math.max(0, budget.amount - spent);
                   return (
                     <tr key={budget.id}>
@@ -1230,7 +1318,7 @@ const BudgetsView: React.FC<{
           <div className="panel-header">
             <div>
               <div className="panel-title">지출 내역</div>
-              <div className="panel-sub">Reports 하단 테이블을 예산 화면에 배치했습니다</div>
+              
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -1290,9 +1378,22 @@ const BudgetsView: React.FC<{
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
                 >
-                  {expenseCategories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
+                  {categories
+                    .filter((p) => p.type === 'expense' && !p.parent_id)
+                    .map((parent) => {
+                      const children = categories.filter((c) => c.parent_id === parent.id);
+                      const leafChildren = children.filter((c) => !categories.some((cc) => cc.parent_id === c.id));
+                      if (leafChildren.length === 0) return null;
+                      return (
+                        <optgroup key={parent.id} label={parent.name}>
+                          {leafChildren.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                 </select>
               </div>
               <div className="form-group">
@@ -2734,3 +2835,4 @@ const ProfileView: React.FC = () => {
 };
 
 export default App;
+
