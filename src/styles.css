@@ -259,8 +259,11 @@ body[data-theme="dark"] .header-center button:hover {
 }
 
 body[data-theme="dark"] .header-center button.active {
-  font-weight: 700 ;
+  font-weight: 700;
   color: #FFFFFF;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .header-right {
@@ -1920,7 +1923,7 @@ body[data-theme="dark"] .card.balance-card {
 
 .manage-row .tx-col-amount {
   justify-content: flex-end;
-  text-align: center;
+  text-align: right;
 }
 
 .manage-row .tx-col-actions {
@@ -1930,7 +1933,51 @@ body[data-theme="dark"] .card.balance-card {
 }
 
 .budgets-table .tx-row {
-  grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+}
+
+.budgets-expense-table .tx-row {
+  grid-template-columns: 1fr 1.4fr 1fr 1.1fr 1.2fr;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.budgets-expense-table .tx-col-date,
+.budgets-expense-table .tx-col-account,
+.budgets-expense-table .tx-col-memo {
+  text-align: center;
+  justify-content: center;
+}
+
+.budgets-expense-table .tx-col-label {
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.budgets-expense-table .tx-col-amount {
+  text-align: center;
+  justify-content: flex-end;
+}
+
+.goals-manage-table .tx-row {
+  grid-template-columns: 1.6fr 0.8fr 1fr 1fr 1fr 0.9fr;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.goals-manage-table .tx-col-label {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.goals-manage-table .tx-col-amount {
+  text-align: right;
+  justify-content: flex-end;
+}
+
+.goals-manage-table .tx-col-date {
+  text-align: center;
+  justify-content: center;
 }
 
 .card-header {

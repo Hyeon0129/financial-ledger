@@ -73,6 +73,7 @@ const App: React.FC = () => {
   }, [transactions, month]);
 
   const [stats, setStats] = useState<MonthlyStats | null>(null);
+  const [yearlyStats, setYearlyStats] = useState<{ year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Apply theme
@@ -126,14 +127,17 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadMonthData = async () => {
       try {
-        const [txs, bds, monthStats] = await Promise.all([
+        const year = Number(month.split('-')[0]);
+        const [txs, bds, monthStats, yrStats] = await Promise.all([
           transactionsApi.list({ month }),
           budgetsApi.list(),
           statsApi.monthly(month),
+          statsApi.yearly(year),
         ]);
         setTransactions(normalizeTransactions(txs));
         setBudgets(bds);
         setStats(monthStats);
+        setYearlyStats(yrStats);
       } catch (error) {
         console.error('Failed to load month data:', error);
       }
@@ -146,14 +150,18 @@ const App: React.FC = () => {
     const txs = await transactionsApi.list({ month });
     setTransactions(normalizeTransactions(txs));
     const monthStats = await statsApi.monthly(month);
+    const yrStats = await statsApi.yearly(Number(month.split('-')[0]));
     setStats(monthStats);
+    setYearlyStats(yrStats);
   }, [month, normalizeTransactions]);
 
   const refreshBudgets = useCallback(async () => {
     const bds = await budgetsApi.list();
     setBudgets(bds);
     const monthStats = await statsApi.monthly(month);
+    const yrStats = await statsApi.yearly(Number(month.split('-')[0]));
     setStats(monthStats);
+    setYearlyStats(yrStats);
   }, [month]);
 
   const refreshCategories = useCallback(async () => {
@@ -308,6 +316,7 @@ const App: React.FC = () => {
           {view === 'reports' && (
             <ReportsView
               stats={stats}
+              yearlyStats={yearlyStats}
               currency={currency}
             />
           )}
@@ -932,7 +941,7 @@ const TransactionsView: React.FC<{
                 <div key={t.id} className="tx-row manage-row">
                   <div className="tx-col-type">
                     <span className={`badge ${t.type}`}>
-                      {t.type === 'income' ? 'IN' : 'OUT'}
+                      {t.type === 'income' ? '수입' : '지출'}
                     </span>
                   </div>
                   <div className="tx-main tx-col-label">
@@ -1324,7 +1333,6 @@ const BudgetsView: React.FC<{
           <div className="transactions-table-lite budgets-expense-table manage-table">
             <div className="tx-row manage-head">
               <div className="tx-col-date">날짜</div>
-              <div className="tx-col-type">TYPE</div>
               <div className="tx-col-label">카테고리</div>
               <div className="tx-col-amount">금액</div>
               <div className="tx-col-account">Account</div>
@@ -1333,11 +1341,6 @@ const BudgetsView: React.FC<{
             {expenseTransactions.map((t) => (
               <div key={t.id} className="tx-row manage-row">
                 <div className="tx-col-date">{formatDate(t.date)}</div>
-                <div className="tx-col-type">
-                  <span className={`badge ${t.type}`}>
-                    {t.type === 'income' ? 'IN' : 'OUT'}
-                  </span>
-                </div>
                 <div className="tx-main tx-col-label">
                   <div className="tx-main-text">
                     <div className="tx-name">{t.category_name}</div>
@@ -2043,13 +2046,22 @@ const AccountFormModal: React.FC<{
 };
 
 // ========== Reports View ==========
+type YearlyStats = { year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> };
+
 const ReportsView: React.FC<{
   stats: MonthlyStats | null;
+  yearlyStats: YearlyStats | null;
   currency: string;
-}> = ({ stats, currency }) => {
+}> = ({ stats, yearlyStats, currency }) => {
   const expenseByCategory = stats?.byCategory
     .filter((c) => c.type === 'expense')
     .sort((a, b) => b.total - a.total) ?? [];
+
+  const daysInMonth = useMemo(() => {
+    if (!stats) return 30;
+    const [y, m] = stats.month.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  }, [stats]);
 
   const lineData = useMemo(() => {
     if (!stats) return [];
@@ -2085,28 +2097,45 @@ const ReportsView: React.FC<{
 
   if (!stats) return <div className="loading-spinner" />;
 
+  const topExpense = expenseByCategory[0];
+  const yearlyExpense = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'expense');
+  const yearlyIncome = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'income');
+  const yearlyCombined = yearlyExpense.map((e) => ({
+    month: e.month,
+    expense: e.total,
+    income: yearlyIncome.find((i) => i.month === e.month)?.total || 0,
+  }));
+
   return (
     <div className="reports-stack">
       <div className="card-grid card-grid-3">
         <div className="card">
-          <div className="card-title">총 거래 건수</div>
-          <div className="card-value">{stats.transactionCount}건</div>
-          <div className="card-sub">이번 달 전체 거래</div>
+          <div className="card-title">이번 달 수입</div>
+          <div className="card-value">{formatCurrency(stats.income, currency)}</div>
+          <div className="card-sub">{stats.month}</div>
+        </div>
+        <div className="card">
+          <div className="card-title">이번 달 지출</div>
+          <div className="card-value expense">{formatCurrency(stats.expense, currency)}</div>
+          <div className="card-sub">{stats.month}</div>
         </div>
         <div className="card">
           <div className="card-title">일평균 지출</div>
           <div className="card-value expense">
-            {formatCurrency(Math.round(stats.expense / new Date().getDate()), currency)}
+            {formatCurrency(Math.round(stats.expense / daysInMonth), currency)}
           </div>
-          <div className="card-sub">하루 평균 지출 금액</div>
+          <div className="card-sub">하루 평균</div>
+        </div>
+        <div className="card">
+          <div className="card-title">총 거래 건수</div>
+          <div className="card-value">{stats.transactionCount}건</div>
+          <div className="card-sub">월간 합계</div>
         </div>
         <div className="card">
           <div className="card-title">최고 지출 카테고리</div>
-          <div className="card-value">
-            {expenseByCategory[0]?.category_name || '-'}
-          </div>
+          <div className="card-value">{topExpense?.category_name || '-'}</div>
           <div className="card-sub">
-            {expenseByCategory[0] ? formatCurrency(expenseByCategory[0].total, currency) : '-'}
+            {topExpense ? formatCurrency(topExpense.total, currency) : '-'}
           </div>
         </div>
       </div>
@@ -2229,6 +2258,37 @@ const ReportsView: React.FC<{
         <div className="card" style={{ padding: 24 }}>
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
+              <div className="card-title">연간 지출/수입 추이</div>
+              <div className="card-subtitle">{yearlyStats ? `${yearlyStats.year}년` : ''}</div>
+            </div>
+          </div>
+          <div style={{ height: 320 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={yearlyCombined} margin={{ left: -10, right: 10, top: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: tooltipBg,
+                    border: `1px solid ${tooltipBorder}`,
+                    color: tooltipText,
+                    borderRadius: 12,
+                    boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
+                  }}
+                  labelStyle={{ color: tooltipLabel, fontWeight: 700 }}
+                  formatter={(v: number, n) => [formatCurrency(v, currency), n]}
+                />
+                <Bar dataKey="expense" fill="#f87171" radius={[6, 6, 0, 0]} />
+                <Line dataKey="income" stroke="#22c55e" strokeWidth={2} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: 24 }}>
+          <div className="card-header" style={{ marginBottom: 12 }}>
+            <div>
               <div className="card-title">지출 카테고리 분석</div>
               <div className="card-subtitle">카테고리별 지출</div>
             </div>
@@ -2309,38 +2369,34 @@ const SavingsView: React.FC<{
       </div>
 
       {goals.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table glass-table goals-table" style={{ minWidth: 720 }}>
-            <thead>
-              <tr>
-                <th>목표</th>
-                <th style={{ textAlign: 'right' }}>진행률</th>
-                <th style={{ textAlign: 'right' }}>현재 금액</th>
-                <th style={{ textAlign: 'right' }}>목표 금액</th>
-                <th>기한</th>
-                <th style={{ textAlign: 'center', width: 120 }}>작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goals.map((goal) => {
-                const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
-                return (
-                  <tr key={goal.id}>
-                    <td>{goal.name}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{progress.toFixed(0)}%</td>
-                    <td style={{ textAlign: 'right' }}>{formatCurrency(goal.current_amount, currency)}</td>
-                    <td style={{ textAlign: 'right' }}>{formatCurrency(goal.target_amount, currency)}</td>
-                    <td>{goal.deadline ? formatDate(goal.deadline) : '-'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="transactions-table-lite goals-manage-table">
+          <div className="tx-row manage-head">
+            <div className="tx-col-label">목표</div>
+            <div className="tx-col-amount">진행률</div>
+            <div className="tx-col-amount">현재 금액</div>
+            <div className="tx-col-amount">목표 금액</div>
+            <div className="tx-col-date">기한</div>
+            <div className="tx-col-actions">작업</div>
+          </div>
+          {goals.map((goal) => {
+            const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
+            return (
+              <div key={goal.id} className="tx-row manage-row">
+                <div className="tx-main tx-col-label">
+                  <div className="tx-main-text">
+                    <div className="tx-name">{goal.name}</div>
+                  </div>
+                </div>
+                <div className="tx-col-amount">{progress.toFixed(0)}%</div>
+                <div className="tx-amount tx-col-amount">{formatCurrency(goal.current_amount, currency)}</div>
+                <div className="tx-amount tx-col-amount">{formatCurrency(goal.target_amount, currency)}</div>
+                <div className="tx-col-date">{goal.deadline ? formatDate(goal.deadline) : '-'}</div>
+                <div className="tx-col-actions">
+                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state" style={{ borderRadius: 20, padding: 60 }}>
