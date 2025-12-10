@@ -61,6 +61,17 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>([]);
+  const monthlyAccountSpend = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions
+      .filter((t) => t.type === 'expense' && t.date.startsWith(month))
+      .forEach((t) => {
+        if (!t.account_id) return;
+        map[t.account_id] = (map[t.account_id] || 0) + t.amount;
+      });
+    return map;
+  }, [transactions, month]);
+
   const [stats, setStats] = useState<MonthlyStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -289,6 +300,8 @@ const App: React.FC = () => {
           {view === 'accounts' && (
             <AccountsView
               accounts={accounts}
+              currency={currency}
+              monthlySpend={monthlyAccountSpend}
               onRefresh={refreshAccounts}
             />
           )}
@@ -565,7 +578,7 @@ const DashboardView: React.FC<{
           </div>
           <div className="transactions-table-lite">
             <div className="tx-row tx-head">
-              <div className="tx-main tx-col-label">CATEGORYㅣ거ㄹ</div>
+              <div className="tx-main tx-col-label">CATEGORY</div>
               <div className="tx-amount-head tx-col-amount">Amount</div>
               <div className="tx-progress-head tx-col-progress">Progress</div>
             </div>
@@ -908,53 +921,38 @@ const TransactionsView: React.FC<{
           </div>
 
           {selectedDayTransactions.length > 0 ? (
-            <table className="data-table" style={{ fontSize: 13 }}>
-          <thead>
-            <tr>
-                  <th>Type</th>
-                  <th>Category</th>
-                  <th style={{ textAlign: 'right' }}>Amount</th>
-                  <th style={{ width: 120 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-                {selectedDayTransactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>
-                      <span className={`badge ${t.type}`}>
-                        {t.type === 'income' ? 'IN' : 'OUT'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{t.category_name}</div>
+            <div className="transactions-table-lite manage-table">
+              <div className="tx-row manage-head">
+                <div className="tx-col-type">TYPE</div>
+                <div className="tx-col-label">CATEGORY</div>
+                <div className="tx-col-amount">AMOUNT</div>
+                <div className="tx-col-actions">ACTIONS</div>
+              </div>
+              {selectedDayTransactions.map((t) => (
+                <div key={t.id} className="tx-row manage-row">
+                  <div className="tx-col-type">
+                    <span className={`badge ${t.type}`}>
+                      {t.type === 'income' ? 'IN' : 'OUT'}
+                    </span>
+                  </div>
+                  <div className="tx-main tx-col-label">
+                    <div className="tx-main-text">
+                      <div className="tx-name">{t.category_name}</div>
                       {t.memo && (
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                          {t.memo}
-                        </div>
+                        <div className="tx-memo">{t.memo}</div>
                       )}
-                    </td>
-                    <td style={{ 
-                      textAlign: 'right', 
-                      fontWeight: 700,
-                      color: t.type === 'income' ? 'var(--success)' : 'var(--danger)',
-                      fontFeatureSettings: '"tnum"'
-                    }}>
-                      {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount, currency)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-sm" onClick={() => handleEdit(t)}>
-                          수정
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>
-                        삭제
-                      </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
+                    </div>
+                  </div>
+                  <div className={`tx-amount tx-col-amount ${t.type === 'income' ? 'positive' : 'negative'}`}>
+                    {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount, currency)}
+                  </div>
+                  <div className="tx-col-actions">
+                    <button className="btn btn-sm" onClick={() => handleEdit(t)}>수정</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>삭제</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : selectedDate ? (
             <div className="empty-state">
               <div className="empty-state-text">No transactions</div>
@@ -1276,45 +1274,44 @@ const BudgetsView: React.FC<{
             <button className="btn btn-primary btn-sm" onClick={openCreate}>예산 추가</button>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table glass-table" style={{ minWidth: 680 }}>
-              <thead>
-                <tr>
-                  <th>카테고리</th>
-                  <th style={{ textAlign: 'right' }}>예산</th>
-                  <th style={{ textAlign: 'right' }}>사용액</th>
-                  <th style={{ textAlign: 'right' }}>잔액</th>
-                  <th style={{ textAlign: 'center', width: 120 }}>작업</th>
-                </tr>
-              </thead>
-              <tbody>
-                {budgets.map((budget) => {
-                  const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
-                  const remaining = Math.max(0, budget.amount - spent);
-                  return (
-                    <tr key={budget.id}>
-                      <td>{budget.category_name}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(budget.amount, currency)}</td>
-                      <td style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700 }}>{formatCurrency(spent, currency)}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 700 }}>{formatCurrency(remaining, currency)}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                          <button className="btn btn-sm" onClick={() => openEdit(budget)}>수정</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {budgets.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>
-                      예산이 없습니다. 추가 버튼을 눌러 등록하세요.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="transactions-table-lite budgets-table">
+            <div className="tx-row manage-head">
+              <div className="tx-col-label">카테고리</div>
+              <div className="tx-col-amount">예산</div>
+              <div className="tx-col-amount">사용액</div>
+              <div className="tx-col-amount">잔액</div>
+              <div className="tx-col-actions">작업</div>
+            </div>
+            {budgets.map((budget) => {
+              const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
+              const remaining = Math.max(0, budget.amount - spent);
+              return (
+                <div key={budget.id} className="tx-row manage-row">
+                  <div className="tx-main tx-col-label">
+                    <span className="tx-dot" style={{ background: budget.category_color || '#60a5fa' }} />
+                    <div className="tx-main-text">
+                      <div className="tx-name">{budget.category_name}</div>
+                    </div>
+                  </div>
+                  <div className="tx-amount tx-col-amount">{formatCurrency(budget.amount, currency)}</div>
+                  <div className="tx-amount tx-col-amount negative">{formatCurrency(spent, currency)}</div>
+                  <div className="tx-amount tx-col-amount positive">{formatCurrency(remaining, currency)}</div>
+                  <div className="tx-col-actions">
+                    <button className="btn btn-sm" onClick={() => openEdit(budget)}>수정</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
+                  </div>
+                </div>
+              );
+            })}
+            {budgets.length === 0 && (
+              <div className="tx-row" style={{ justifyContent: 'center' }}>
+                <div className="tx-main" style={{ justifyContent: 'center' }}>
+                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
+                    예산이 없습니다. 추가 버튼을 눌러 등록하세요.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1322,41 +1319,44 @@ const BudgetsView: React.FC<{
           <div className="panel-header">
             <div>
               <div className="panel-title">지출 내역</div>
-              
             </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table glass-table" style={{ fontSize: 13, minWidth: 760 }}>
-              <thead>
-                <tr>
-                  <th>날짜</th>
-                  <th>Type</th>
-                  <th>카테고리</th>
-                  <th style={{ textAlign: 'right' }}>금액</th>
-                  <th>Account</th>
-                  <th>Memo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenseTransactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>{formatDate(t.date)}</td>
-                    <td>{t.type.toUpperCase()}</td>
-                    <td>{t.category_name}</td>
-                    <td style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700 }}>{formatCurrency(t.amount, currency)}</td>
-                    <td>{t.account_name || '-'}</td>
-                    <td>{t.memo || '-'}</td>
-                  </tr>
-                ))}
-                {expenseTransactions.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>
-                      지출 내역이 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="transactions-table-lite budgets-expense-table manage-table">
+            <div className="tx-row manage-head">
+              <div className="tx-col-date">날짜</div>
+              <div className="tx-col-type">TYPE</div>
+              <div className="tx-col-label">카테고리</div>
+              <div className="tx-col-amount">금액</div>
+              <div className="tx-col-account">Account</div>
+              <div className="tx-col-memo">Memo</div>
+            </div>
+            {expenseTransactions.map((t) => (
+              <div key={t.id} className="tx-row manage-row">
+                <div className="tx-col-date">{formatDate(t.date)}</div>
+                <div className="tx-col-type">
+                  <span className={`badge ${t.type}`}>
+                    {t.type === 'income' ? 'IN' : 'OUT'}
+                  </span>
+                </div>
+                <div className="tx-main tx-col-label">
+                  <div className="tx-main-text">
+                    <div className="tx-name">{t.category_name}</div>
+                  </div>
+                </div>
+                <div className="tx-amount tx-col-amount negative">{formatCurrency(t.amount, currency)}</div>
+                <div className="tx-col-account">{t.account_name || '-'}</div>
+                <div className="tx-col-memo">{t.memo || '-'}</div>
+              </div>
+            ))}
+            {expenseTransactions.length === 0 && (
+              <div className="tx-row" style={{ justifyContent: 'center' }}>
+                <div className="tx-main" style={{ justifyContent: 'center' }}>
+                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
+                    지출 내역이 없습니다.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1521,89 +1521,84 @@ const CategoriesView: React.FC<{
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
-      <div className="panel-main" style={{ marginBottom: 20 }}>
+
+      <div className="panel-main categories-panel">
         <div className="panel-header">
           <div>
             <div className="panel-title">지출 카테고리</div>
-            <div className="panel-sub">대분류와 소분류를 테이블로 구분해 보여줍니다</div>
+            <div className="panel-sub">대분류와 소분류를 그리드 테이블로 표시합니다</div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table glass-table" style={{ minWidth: 720 }}>
-            <thead>
-              <tr>
-                <th>대분류</th>
-                <th>소분류</th>
-                <th>구분</th>
-                <th style={{ width: 160, textAlign: 'center' }}>작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenseTree.grouped.map(({ parent, children }) => (
-                <React.Fragment key={parent.id}>
-                  <tr className="category-parent-row">
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="color-dot" style={{ background: parent.color }} />
-                        <span>{parent.name}</span>
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-tertiary)' }}>-</td>
-                    <td>대분류</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button className="btn btn-sm" onClick={() => handleEdit(parent)}>수정</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>삭제</button>
-                      </div>
-                    </td>
-                  </tr>
-                  {children.map((child) => (
-                    <tr key={child.id} className="category-child-row">
-                      <td style={{ color: 'var(--text-tertiary)' }}>{parent.name}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className="color-dot" style={{ background: child.color }} />
-                          <span>{child.name}</span>
-                        </div>
-                      </td>
-                      <td>소분류</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                          <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-              {expenseTree.orphans.map((child) => (
-                <tr key={child.id} className="category-child-row">
-                  <td style={{ color: 'var(--text-tertiary)' }}>미분류</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="color-dot" style={{ background: child.color }} />
-                      <span>{child.name}</span>
+        <div className="transactions-table-lite categories-table">
+          <div className="tx-row categories-head">
+            <div className="tx-col-label">대분류</div>
+            <div className="tx-col-child">소분류</div>
+            <div className="tx-col-type">구분</div>
+            <div className="tx-col-actions">작업</div>
+          </div>
+
+          {expenseTree.grouped.map(({ parent, children }) => (
+            <React.Fragment key={parent.id}>
+              <div className="tx-row category-parent-row">
+                <div className="tx-main tx-col-label">
+                  <span className="tx-dot" style={{ background: parent.color }} />
+                  <div className="tx-main-text">
+                    <div className="tx-name">{parent.name}</div>
+                  </div>
+                </div>
+                <div className="tx-col-child muted">-</div>
+                <div className="tx-col-type">대분류</div>
+                <div className="tx-col-actions">
+                  <button className="btn btn-sm" onClick={() => handleEdit(parent)}>수정</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>삭제</button>
+                </div>
+              </div>
+
+              {children.map((child) => (
+                <div key={child.id} className="tx-row category-child-row">
+                  <div className="tx-main tx-col-label">
+                    <span className="tx-dot" style={{ background: child.color }} />
+                    <div className="tx-main-text">
+                      <div className="tx-name">{child.name}</div>
                     </div>
-                  </td>
-                  <td>소분류</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                      <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
-                    </div>
-                  </td>
-                </tr>
+                  </div>
+                  <div className="tx-col-child">{parent.name}</div>
+                  <div className="tx-col-type">소분류</div>
+                  <div className="tx-col-actions">
+                    <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+                  </div>
+                </div>
               ))}
-              {expenseCategories.length === 0 && (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--text-tertiary)' }}>
-                    지출 카테고리가 없습니다. 상단 버튼으로 추가하세요.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            </React.Fragment>
+          ))}
+
+          {expenseTree.orphans.map((child) => (
+            <div key={child.id} className="tx-row category-child-row">
+              <div className="tx-main tx-col-label">
+                <span className="tx-dot" style={{ background: child.color }} />
+                <div className="tx-main-text">
+                  <div className="tx-name">{child.name}</div>
+                </div>
+              </div>
+              <div className="tx-col-child">미분류</div>
+              <div className="tx-col-type">소분류</div>
+              <div className="tx-col-actions">
+                <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+              </div>
+            </div>
+          ))}
+
+          {expenseCategories.length === 0 && (
+            <div className="tx-row" style={{ justifyContent: 'center' }}>
+              <div className="tx-main" style={{ justifyContent: 'center' }}>
+                <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
+                  지출 카테고리가 없습니다. 상단 버튼으로 추가하세요.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1848,9 +1843,21 @@ const CategoryFormModal: React.FC<{
 // ========== Accounts View ==========
 const AccountsView: React.FC<{
   accounts: Account[];
+  currency: string;
+  monthlySpend: Record<string, number>;
   onRefresh: () => void;
-}> = ({ accounts, onRefresh }) => {
+}> = ({ accounts, currency, monthlySpend, onRefresh }) => {
   const [showForm, setShowForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+
+  const cardThemes = [
+    'card-theme-emerald',
+    'card-theme-carbon',
+    'card-theme-gold',
+    'card-theme-slate',
+    'card-theme-midnight',
+    'card-theme-obsidian',
+  ];
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('이 계좌를 삭제할까요?')) return;
@@ -1865,59 +1872,64 @@ const AccountsView: React.FC<{
           <div className="panel-title">계좌 관리</div>
           <div className="panel-sub">저축통장, 신용카드, 체크카드 등을 관리합니다</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+        <button className="btn btn-primary" onClick={() => { setEditingAccount(null); setShowForm(true); }}>
           <Icons.Plus /> 새 계좌
         </button>
       </div>
 
-      <div className="panel" style={{ gridTemplateColumns: '1fr' }}>
-        <div className="panel-main">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>유형</th>
-                <th>계좌명</th>
-                <th style={{ textAlign: 'right' }}>잔액</th>
-                <th style={{ width: 120 }}>작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account) => (
-                <tr key={account.id}>
-                  <td>
-                    <span className="badge" style={{ 
-                      background: `${account.color}20`, 
-                      color: account.color 
-                    }}>
-                      {account.type.toUpperCase()}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{account.name}</td>
-                  <td style={{ 
-                    textAlign: 'right', 
-                    fontWeight: 700,
-                    color: account.balance >= 0 ? 'var(--success)' : 'var(--danger)',
-                    fontFeatureSettings: '"tnum"'
-                  }}>
-                    ₩ {account.balance.toLocaleString()}
-                  </td>
-                  <td>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(account.id)}>
-                      삭제
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="account-grid">
+        {accounts.map((account, idx) => {
+          const theme = cardThemes[idx % cardThemes.length];
+          return (
+            <div
+              key={account.id}
+              className={`account-card bank-card real ${theme}`}
+              onClick={() => { setEditingAccount(account); setShowForm(true); }}
+            >
+              <div className="account-card-top">
+                <div className="account-title">{account.name}</div>
+              </div>
+              <div className="account-card-bottom">
+                <div className="account-balance-big">
+                  {formatCurrency(account.balance, currency)}
+                </div>
+                <div className="account-balance-sub">
+                  이번 달 사용: {formatCurrency(monthlySpend[account.id] ?? 0, currency)}
+                </div>
+              </div>
+              <div className="account-card-actions">
+                <button
+                  className="btn btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingAccount(account);
+                    setShowForm(true);
+                  }}
+                >
+                  수정
+                </button>
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(account.id);
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {showForm && (
         <AccountFormModal
-          onClose={() => setShowForm(false)}
+          account={editingAccount}
+          onClose={() => { setShowForm(false); setEditingAccount(null); }}
           onSave={() => {
             setShowForm(false);
+            setEditingAccount(null);
             onRefresh();
           }}
         />
@@ -1928,19 +1940,15 @@ const AccountsView: React.FC<{
 
 // ========== Account Form Modal ==========
 const AccountFormModal: React.FC<{
+  account?: Account | null;
   onClose: () => void;
   onSave: () => void;
-}> = ({ onClose, onSave }) => {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'cash' | 'bank' | 'card' | 'investment'>('bank');
-  const [balance, setBalance] = useState('');
-  const [color, setColor] = useState('#3B82F6');
+}> = ({ account, onClose, onSave }) => {
+  const isEdit = !!account?.id;
+  const [name, setName] = useState(account?.name ?? '');
+  const [type, setType] = useState<'cash' | 'bank' | 'card' | 'investment'>(account?.type ?? 'bank');
+  const [balance, setBalance] = useState(account ? String(account.balance) : '');
   const [saving, setSaving] = useState(false);
-
-  const colors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
-    '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1951,13 +1959,19 @@ const AccountFormModal: React.FC<{
 
     setSaving(true);
     try {
-      await accountsApi.create({
+      const color = account?.color ?? '#3B82F6';
+      const payload = {
         name: name.trim(),
         type,
         balance: Number(balance.replace(/,/g, '')) || 0,
         color,
-        icon: null,
-      });
+        icon: account?.icon ?? null,
+      };
+      if (account?.id) {
+        await accountsApi.update(account.id, payload);
+      } else {
+        await accountsApi.create(payload);
+      }
       onSave();
     } catch {
       alert('저장에 실패했습니다.');
@@ -1971,8 +1985,8 @@ const AccountFormModal: React.FC<{
       <div className="modal-content">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <div className="panel-title">새 계좌</div>
-            <div className="panel-sub">계좌 정보를 입력해주세요</div>
+            <div className="panel-title">{isEdit ? '계좌 수정' : '새 계좌'}</div>
+            <div className="panel-sub">{isEdit ? '계좌 정보를 수정합니다' : '계좌 정보를 입력해주세요'}</div>
           </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
             <Icons.Close />
@@ -2012,24 +2026,6 @@ const AccountFormModal: React.FC<{
               value={balance}
               onChange={(e) => setBalance(e.target.value)}
             />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">색상</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: c, border: color === c ? '3px solid #000' : 'none',
-                    cursor: 'pointer',
-                  }}
-                />
-              ))}
-            </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
@@ -2120,7 +2116,7 @@ const ReportsView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">Activity Summary</div>
-              <div className="card-subtitle">지출 추이</div>
+              
             </div>
           </div>
           <div style={{ height: 320 }}>
@@ -2839,4 +2835,5 @@ const ProfileView: React.FC = () => {
 };
 
 export default App;
+
 

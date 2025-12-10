@@ -211,14 +211,20 @@ body[data-theme="dark"] .app-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(0,0,0,0.05);
-  border-radius: 12px;
-  padding: 6px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 6px 10px;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow:
+    0 10px 22px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 body[data-theme="dark"] .header-center {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .header-center button {
@@ -238,9 +244,10 @@ body[data-theme="dark"] .header-center {
 }
 
 .header-center button.active {
-  background: #FFFFFF;
-  color: var(--text-primary);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  background: transparent;
+  color: #ffffff;
+  box-shadow: none;
+  border: none;
 }
 
 body[data-theme="dark"] .header-center button {
@@ -252,7 +259,7 @@ body[data-theme="dark"] .header-center button:hover {
 }
 
 body[data-theme="dark"] .header-center button.active {
-  background: rgba(255,255,255,.12);
+  font-weight: 700 ;
   color: #FFFFFF;
 }
 
@@ -267,11 +274,13 @@ body[data-theme="dark"] .header-center button.active {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255,255,255,0.06);
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 6px 10px;
-  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 6px 12px;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
 
 .month-nav button {
@@ -584,29 +593,29 @@ body[data-theme="dark"] .progress-bar {
 }
 
 .balance-btn {
-  height: 46px;
+  height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 12px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
+  padding: 0 14px;
+  background: linear-gradient(140deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 13px;
   font-size: 13px;
   font-weight: 700;
-  color: #e6f4ed;
+  color: #eef3f8;
   letter-spacing: -0.01em;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
   transition: all var(--transition-base);
 }
 
 .balance-btn:hover {
-  background: linear-gradient(135deg, rgba(34,197,94,0.24), rgba(13,93,60,0.8));
-  border-color: rgba(34,197,94,0.55);
+  background: linear-gradient(140deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07));
+  border-color: rgba(255,255,255,0.22);
   transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(34,197,94,0.15) inset;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
 }
 
 .balance-btn:active {
@@ -615,18 +624,18 @@ body[data-theme="dark"] .progress-bar {
 }
 
 .balance-btn:focus-visible {
-  outline: 2px solid rgba(34,197,94,0.7);
+  outline: 2px solid rgba(255,255,255,0.35);
   outline-offset: 2px;
 }
 
 body[data-theme="dark"] .balance-btn {
-  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-  border-color: rgba(255,255,255,0.14);
-  color: #e6f4ed;
+  background: linear-gradient(140deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  border-color: rgba(255,255,255,0.12);
+  color: #eef3f8;
 }
 
 body[data-theme="dark"] .balance-btn:hover {
-  background: linear-gradient(135deg, rgba(34,197,94,0.22), rgba(13,93,60,0.75));
+  background: linear-gradient(140deg, rgba(255,255,255,0.15), rgba(255,255,255,0.07));
 }
 
 .currencies-card {
@@ -1650,10 +1659,12 @@ body[data-theme="dark"] .card:hover {
 .card.balance-card {
   position: relative;
   overflow: hidden;
-  padding: 28px 24px;
-  background: linear-gradient(145deg, #0c1210, #07100a);
-  border: 1px solid rgba(34,197,94,0.16);
-  color: #eaf7ef;
+  padding: 32px 26px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255,255,255,0.07), transparent 38%),
+    linear-gradient(160deg, #1a1e25, #0d0f14 55%, #0a0c11);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #e9edf4;
   box-shadow:
     0 24px 50px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255,255,255,0.04);
@@ -1661,12 +1672,13 @@ body[data-theme="dark"] .card:hover {
 
 body[data-theme="dark"] .card.balance-card {
   background:
-    radial-gradient(circle at 18% 16%, rgba(34,197,94,0.22), rgba(34,197,94,0.08) 38%, transparent 62%),
-    linear-gradient(145deg, #090e15, #07110c);
-  border-color: rgba(34,197,94,0.3);
+    radial-gradient(circle at 22% 18%, rgba(255,255,255,0.08), transparent 38%),
+    radial-gradient(circle at 78% 16%, rgba(0,0,0,0.3), transparent 42%),
+    linear-gradient(160deg, #1b2028, #0e1016 58%, #090b10);
+  border-color: rgba(255,255,255,0.06);
   box-shadow:
     0 26px 55px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(34,197,94,0.1) inset;
+    0 0 0 1px rgba(255,255,255,0.02) inset;
 }
 
 .card.balance-card::after {
@@ -1674,14 +1686,16 @@ body[data-theme="dark"] .card.balance-card {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06), transparent 40%);
+  background:
+    radial-gradient(circle at 78% 24%, rgba(255,255,255,0.08), transparent 36%),
+    radial-gradient(circle at 50% 70%, rgba(0,0,0,0.2), transparent 46%);
 }
 
 .balance-hero {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .balance-kicker {
@@ -1694,7 +1708,7 @@ body[data-theme="dark"] .card.balance-card {
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #f5fff8;
+  color: #f6fafc;
   line-height: 1.1;
 }
 
@@ -1704,14 +1718,14 @@ body[data-theme="dark"] .card.balance-card {
 }
 
 .balance-breakdown {
-  margin-top: 4px;
-  padding: 14px 16px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  margin-top: 12px;
+  padding: 18px 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .balance-row {
@@ -1724,7 +1738,7 @@ body[data-theme="dark"] .card.balance-card {
 .balance-row-label {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(234,247,238,0.82);
+  color: rgba(233,237,244,0.8);
 }
 
 .balance-row-value {
@@ -1744,12 +1758,180 @@ body[data-theme="dark"] .card.balance-card {
 }
 
 .balance-actions {
-  margin-top: 16px;
+  margin-top: 20px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
+/* Accounts page cards */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.account-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 22px 24px;
+  aspect-ratio: 16 / 9;
+  min-height: 220px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(150deg, #1b1f27, #0f1117);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  cursor: pointer;
+}
+
+.account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 42px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.account-card-top {
+  position: relative;
+  z-index: 1;
+}
+
+.account-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #f1f4f9;
+}
+
+.account-type-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: none;
+}
+
+.account-balance-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.78);
+  letter-spacing: 0.02em;
+}
+
+.account-card-bottom {
+  position: absolute;
+  left: 24px;
+  bottom: 22px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-balance-big {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.account-card-actions {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+/* Categories table (dashboard-style) */
+.categories-panel {
+  margin-top: 16px;
+}
+
+.categories-table {
+  min-height: 320px;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  padding: 4px 0;
+}
+
+.categories-table .tx-row {
+  grid-template-columns: 1.1fr 1.1fr 0.7fr 0.9fr;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.categories-table .tx-col-label {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.categories-table .tx-col-child,
+.categories-table .tx-col-type {
+  justify-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.categories-table .tx-col-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.categories-table .categories-head {
+  opacity: 0.72;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.category-parent-row {
+  background: rgba(255,255,255,0.02);
+}
+
+.category-child-row {
+  background: rgba(255,255,255,0.01);
+}
+
+/* Manage-table (Transactions side + Budgets) */
+.manage-table .tx-row {
+  grid-template-columns: 0.8fr 1.5fr 1fr 1fr;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.manage-head {
+  opacity: 0.8;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.manage-row .tx-col-label {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.manage-row .tx-col-amount {
+  justify-content: flex-end;
+  text-align: center;
+}
+
+.manage-row .tx-col-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.budgets-table .tx-row {
+  grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr;
+}
 
 .card-header {
   display: flex;
@@ -1764,7 +1946,6 @@ body[data-theme="dark"] .card.balance-card {
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-left: 45px;
 }
 
 .metric-icon {
