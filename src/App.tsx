@@ -413,14 +413,34 @@ const DashboardView: React.FC<{
       {/* First Row: Balance + Earnings Report */}
       <div className="dashboard-row">
         <div className="card balance-card">
-          <div className="card-header" style={{ marginBottom: 20 }}>
-            <div className="card-title">잔액</div>
-            <div className="card-subtitle">이번 달</div>
+          <div className="balance-top">
+            <div className="balance-headings">
+              <div className="balance-tag">이번 달</div>
+              <div className="balance-title">이번 달 수입</div>
+              <div className="balance-figure">{formatCurrency(totalIncome, currency)}</div>
+              <div className="balance-subtext">KRW 기준</div>
             </div>
-          <div className="balance-info">
-            <div className="balance-label">현재 잔액</div>
-            <div className="balance-amount">{formatCurrency(stats.balance, currency)}</div>
-            <div className="balance-currency">KRW</div>
+            <div className="balance-mini-chart" aria-hidden="true">
+              <span className="mini-bar mini-bar--muted" />
+              <span className="mini-bar mini-bar--muted" />
+              <span className="mini-bar mini-bar--muted" />
+              <span className="mini-bar mini-bar--active" />
+            </div>
+          </div>
+
+          <div className="balance-breakdown">
+            <div className="balance-row">
+              <div className="balance-row-label">이번 달 수입</div>
+              <div className="balance-row-value positive">{formatCurrency(totalIncome, currency)}</div>
+            </div>
+            <div className="balance-row">
+              <div className="balance-row-label">이번 달 쓴 돈</div>
+              <div className="balance-row-value negative">{formatCurrency(totalExpense, currency)}</div>
+            </div>
+            <div className="balance-row highlight">
+              <div className="balance-row-label">현재 잔액</div>
+              <div className="balance-row-value">{formatCurrency(stats.balance, currency)}</div>
+            </div>
           </div>
           <div className="balance-actions">
             <button className="balance-btn" onClick={() => onNavigate('transactions')}>입출금</button>
@@ -569,7 +589,7 @@ const DashboardView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">Your cards</div>
-              <div className="card-subtitle">이번 달 카드 현황</div>
+              
             </div>
             <button className="btn btn-sm" onClick={() => onNavigate('accounts')}>Manage</button>
           </div>
