@@ -11,6 +11,28 @@
   --bg-tertiary: #F7F7F7;
   --bg-hover: #F5F5F5;
   
+    /* Dark / Black Core */
+    --accent-dark-bg: #050608;
+    --accent-dark-soft: #10131a;
+    --accent-dark-elevated: #171b24;
+    --accent-dark-border: #2b3140;
+    --accent-dark-glow: rgba(148, 163, 184, 0.35);
+  
+    /* Signature Green (현재 스타일 유지 + 살짝 보정) */
+    --accent-green-main: #22c55e;
+    --accent-green-strong: #16a34a;
+    --accent-green-soft: #052917;
+    --accent-green-border: rgba(34, 197, 94, 0.55);
+    --accent-green-glow: rgba(34, 197, 94, 0.45);
+  
+    /* Premium Gold (다크테마 전용) */
+    --accent-gold-main: #f6c453;
+    --accent-gold-strong: #f59e0b;
+    --accent-gold-soft: #231506;
+    --accent-gold-border: rgba(245, 158, 11, 0.5);
+    --accent-gold-glow: rgba(245, 158, 11, 0.45);
+
+
   /* Borders - Extremely Subtle */
   --border-color: rgba(0, 0, 0, 0.06);
   --border-hover: rgba(0, 0, 0, 0.12);
@@ -380,14 +402,21 @@ body[data-theme="dark"] .theme-toggle:hover {
   display: grid;
   grid-template-columns: 440px 1fr;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 0px;
 }
 
 .dashboard-row-2 {
   display: grid;
   grid-template-columns: 440px 1fr 1fr;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 0px;
+}
+
+.dashboard-row-3 {
+  display: grid;
+  grid-template-columns: 1.19fr 0.81fr;
+  gap: 20px;
+  margin-top: 0;
 }
 
 .balance-card {
@@ -457,22 +486,90 @@ body[data-theme="dark"] .metric-spending {
 
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background: rgba(0,0,0,0.08);
-  border-radius: 4px;
+  height: 12px;
+  background: #0b0e12;
+  border-radius: 6px;
   overflow: hidden;
   margin-bottom: 8px;
 }
 
 body[data-theme="dark"] .progress-bar {
-  background: rgba(255,255,255,0.1);
+  background: #0b0e12;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #5B6CF7, #B47CFF);
+  background: linear-gradient(90deg, #22c874, #0d5d3c);
   border-radius: 4px;
   transition: width 0.3s ease;
+}
+
+.wallet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wallet-amount {
+  font-weight: 800;
+  color: #2ee48e;
+  font-feature-settings: 'tnum';
+}
+
+/* 바 전체: 회색 세그먼트 + 사이 간격 */
+.wallet-bar {
+  position: relative;
+  width: 100%;
+  height: 22px;
+  background: #111317;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
+}
+
+/* 한 블록: 막대 4px + 여백 2px = 총 6px */
+.wallet-bar-fill {
+  width: 100%;      /* JS/inline style로 사용 비율만 조절 */
+  height: 100%;
+  background-image: linear-gradient(
+    to right,
+    #22c55e 0 3px,            /* 초록 막대 4px */
+    transparent 4px 6px       /* 여백 2px */
+  );
+  background-size: 6px 100%;  /* 패턴 타일 크기 */
+  background-repeat: repeat-x;
+  transition: width 0.25s ease-out;
+}
+.wallet-sub {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.progress-bar.segmented {
+  position: relative;
+  background: #0b0e12;
+}
+
+.progress-bar.segmented::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to right,
+    rgba(255,255,255,0.08),
+    rgba(255,255,255,0.08) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.segmented-fill {
+  background: linear-gradient(180deg, #34e3a0, #0b7a4b);
 }
 
 .progress-labels {
@@ -666,160 +763,255 @@ body[data-theme="dark"] .transaction-icon {
   color: #EF4444;
 }
 
-.dashboard-row-3 {
-  display: grid;
-  grid-template-columns: 1.19fr 0.81fr;
-  gap: 22px;
-  margin-top: 16px;
-}
 
-.cards-board,
-.goals-board {
-  padding: 20px;
-}
 
-.cards-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 16px;
-}
+/* ===========================
+   Cards row (3장 + 좌우 네비)
+   =========================== */
 
-.bank-card {
-  border-radius: 18px;
-  padding: 16px;
-  border: 1px solid var(--border-color);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-md);
-  background-size: cover;
-  background-position: center;
-  color: #fff;
-}
+   .cards-board .cards-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  
+  .cards-board .cards-list {
+    flex: 1;
+    display: grid;
+    /* 한 장당 최소 320px, 3장까지 표시 (레퍼런스와 동일한 느낌) */
+    grid-template-columns: repeat(3, minmax(320px, 1fr));
+    gap: 18px;
+  }
+  .cards-nav-btn {
+    border: none;
+    outline: none;
+    cursor: pointer;
+    background: transparent;   /* 배경 제거 */
+    box-shadow: none;          /* 그림자 제거 */
+    width: auto;
+    height: auto;
+    padding: 0 6px;
+    border-radius: 0;
+    font-size: 24px;
+    font-weight: 500;
+    color: rgba(248, 250, 252, 0.9);
+    opacity: 0.9;
+    transition: opacity 0.15s ease;
+  }
+  
+  .cards-nav-btn.edge.left {
+    margin-right: 4px;
+  }
+  
+  .cards-nav-btn.edge.right {
+    margin-left: 4px;
+  }
+  
+  .cards-nav-btn:hover:not(:disabled) {
+    opacity: 1;
+    transform: none;
+  }
+  
+  .cards-nav-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+  
+  /* 모바일에서는 카드 1~2개만 보이도록 */
+  @media (max-width: 960px) {
+    .cards-board .cards-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 720px) {
+    .cards-board .cards-list {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+  }
+  
+  /* ===========================
+     Bank Card 기본 스타일
+     (본문보다 약간 밝은 어두운 톤)
+     =========================== */
+  
+     .bank-card {
+      border-radius: 18px;
+      padding: 0; /* 안쪽 패딩은 .bank-card.real에서 처리 */
+      border: none; /* 테두리 색 제거 */
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 16px 30px rgba(0,0,0,0.32);
+      background-size: cover;
+      background-position: center;
+      color: #f5f5f5;
+      position: relative;
+      overflow: hidden;
+    }
+  
+  /* 실제 카드 (배경 이미지 + 어두운 오버레이) */
+  
+  .bank-card.real {
+    position: relative;
+    overflow: hidden;
+  
+    /* ▶ 너가 지정한 카드 크기 */
+    width: 420px;
+    height: 240px;
+  
+    border-radius: 18px;
+  
+    /* 레퍼런스 카드와 비슷한 패딩 */
+    padding: 20px 22px 22px;
+  
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  
+    background-size: cover;
+    background-position: center;
+    color: #f9fafb;
+    text-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+  }
+  
+  /* 어둡게 만드는 오버레이 – 너무 밝지 않게 조정한 부분 */
+  .bank-card.real::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* 아주 약한 어두운 오버레이 */
+    background: rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  /* 살짝 비치는 하이라이트 */
+  .bank-card.real::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 20% 10%,
+      rgba(255, 255, 255, 0.18),
+      transparent 60%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  /* ===========================
+     카드 안의 내용 (텍스트/칩/로고)
+     =========================== */
+  
+  .finance-card-chip {
+    position: relative;
+    width: 40px;
+    height: 26px;
+    border-radius: 7px;
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/chip.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.9));
+    margin-bottom: 10px;
+    z-index: 1;
+  }
+  
+  .finance-card-title {
+    position: relative;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.92;
+    z-index: 1;
+    margin-bottom: 4px;
+  }
+  
+  .finance-card-balance-wrap {
+    position: absolute;
+    left: 22px;
+    bottom: 22px;         /* 카드 완전 아래쪽에 고정 */
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    z-index: 1;
+  }
+  
+  .finance-card-balance {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffffff;
+  }
+  
+  .finance-card-sub {
+    font-size: 12px;
+    opacity: 0.9;
+  }
+  
+  .finance-card-logo {
+    position: absolute;
+    right: 8px;
+    bottom: 24px;
+    width: 80px;
+    height: 30px;
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/visa.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.8));
+    z-index: 1;
+  }
+  
+  /* ===========================
+     배경 이미지 매핑
+     (원하는 번호로 바꿔 쓰면 됨)
+     =========================== */
+  
+  /* 첫 번째 카드 (예: 초록 01번) */
+  .bank-card.real.card-theme-emerald {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/1.jpeg");
+  }
+  
+  /* 두 번째 카드 (예: 네이비 05번) */
+  .bank-card.real.card-theme-carbon {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/5.jpeg");
+  }
+  
+  /* 세 번째 카드 (예: 오렌지 15번) */
+  .bank-card.real.card-theme-gold {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/15.jpeg");
+  }
+  
+  /* 필요시 추가 카드 테마 */
+  .bank-card.real.card-theme-slate {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/8.jpeg");
+  }
+  
+  .bank-card.real.card-theme-midnight {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/18.jpeg");
+  }
+  
+  .bank-card.real.card-theme-obsidian {
+    background-image: url("https://raw.githubusercontent.com/muhammederdem/credit-card-form/master/src/assets/images/23.jpeg");
+  }
+  
+  /* ===========================
+     Goals list (원래 코드 유지)
+     =========================== */
+  
+  .goals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
 
-.bank-card.real {
-  color: #e8ecf0;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
-  background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), transparent 40%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08), transparent 40%), linear-gradient(135deg, #3d4a5a, #2b3038 60%, #1f2228);
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
-.bank-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
 
-.bank-card-brand {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
 
-.bank-card-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.bank-card-type {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 2px;
-}
-
-.bank-card-chip {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-}
-
-.bank-card-number {
-  margin: 10px 0;
-  letter-spacing: 2px;
-  font-weight: 700;
-}
-
-.bank-card-holder-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  margin-bottom: 10px;
-}
-
-.bank-card-holder {
-  font-weight: 700;
-}
-
-.bank-card-exp,
-.bank-card-logo {
-  color: rgba(255,255,255,0.8);
-}
-
-.bank-card-balance {
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #e8ecf0;
-  font-feature-settings: 'tnum';
-}
-
-.bank-card-bottom {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.bank-card-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.bank-card-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-feature-settings: 'tnum';
-}
-
-.bank-card-number {
-  margin: 10px 0;
-  letter-spacing: 2px;
-  font-weight: 700;
-}
-
-.bank-card-holder-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  margin-bottom: 10px;
-}
-
-.bank-card-holder {
-  font-weight: 700;
-}
-
-.bank-card-exp,
-.bank-card-logo {
-  color: rgba(255,255,255,0.8);
-}
-
-.goals-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
 .goal-item {
   padding: 14px;
@@ -1166,6 +1358,85 @@ body[data-theme="dark"] .content {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   align-items: start;
+}
+
+.reports-line-card {
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(180deg, #0b1014 0%, #05080c 100%);
+  border: 1px solid rgba(46, 228, 142, 0.14);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.reports-line-header {
+  padding: 18px 20px 8px;
+}
+
+.reports-line-header .card-title {
+  color: #9fb2c5;
+  letter-spacing: 0.12em;
+}
+
+.reports-line-header .card-subtitle {
+  margin-top: 4px;
+  color: #63ebb0;
+  font-weight: 600;
+}
+
+.reports-line-body {
+  padding: 0 14px 16px;
+}
+
+.reports-line-chart {
+  position: relative;
+  height: 320px;
+  background: radial-gradient(120% 120% at 50% 100%, rgba(28, 189, 125, 0.18), rgba(7, 12, 10, 0.94) 55%, #05080c 100%);
+  border-radius: 14px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.reports-line-chart::before {
+  content: "";
+  position: absolute;
+  inset: -12% -6% 6% -6%;
+  background: linear-gradient(180deg, rgba(46, 228, 142, 0.1) 0%, rgba(10, 16, 14, 0.7) 52%, rgba(5, 8, 12, 0.95) 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.reports-line-chart .recharts-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+.reports-tooltip {
+  background: linear-gradient(180deg, #11151b 0%, #0c0f14 100%);
+  border: 1px solid rgba(42, 75, 60, 0.85);
+  box-shadow:
+    0 22px 50px rgba(0, 0, 0, 0.7),
+    0 10px 30px rgba(34, 226, 140, 0.18);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #e6edf5;
+  min-width: 150px;
+  font-weight: 700;
+}
+
+.reports-tooltip-label {
+  font-size: 12px;
+  color: #9bb5c6;
+  margin-bottom: 6px;
+  text-transform: capitalize;
+}
+
+.reports-tooltip-value {
+  font-size: 20px;
+  color: #f8fbff;
+  letter-spacing: 0.2px;
 }
 
 .card {
@@ -2432,6 +2703,13 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: transparent;
+  border: 1px solid #1a1f27;
+  box-shadow:
+    0 18px 36px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.02);
 }
 
 .color-dot {
@@ -2451,28 +2729,36 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 }
 
 .data-table thead th {
-  padding: var(--space-4) var(--space-4);
-  font-size: 11px;
+  padding: 14px 16px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--text-tertiary);
+  color: #cbd5e1;
   text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 2px solid var(--border-color);
-  background: var(--bg-secondary);
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid #1a1f27;
+  background: linear-gradient(180deg, #12151b, #0d0f13);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.02);
 }
 
 .data-table tbody td {
-  padding: var(--space-4) var(--space-4);
-  border-bottom: 1px solid var(--border-color);
+  padding: 14px 16px;
+  border-bottom: 1px solid #1a1f27;
+  color: #e5e7eb;
+  font-size: 13px;
 }
 
 .data-table tbody tr {
+  background: #0f1217;
   transition: background var(--transition-fast);
 }
 
+.data-table tbody tr:first-child {
+  background: #131821;
+}
+
 .data-table tbody tr:hover {
-  background: var(--bg-hover);
+  background: #171d26;
 }
 
 .data-table tbody tr:last-child td {
@@ -2480,23 +2766,50 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 }
 
 body[data-theme="dark"] .data-table thead th {
-  background: rgba(25, 25, 30, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d4d4d8;
+  background: linear-gradient(180deg, #12151b, #0d0f13);
+  border-bottom: 1px solid #1a1f27;
+  color: #d7dde8;
 }
 
 body[data-theme="dark"] .data-table tbody td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  color: #FFFFFF;
+  border-bottom: 1px solid #1a1f27;
+  color: #e8edf5;
 }
 
 body[data-theme="dark"] .data-table tbody tr:hover {
-  background: rgba(35, 35, 40, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #171d26;
 }
+
+.data-table th:not(:last-child),
+.data-table td:not(:last-child) {
+  border-right: 1px solid #1a1f27;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-pill.success { color: #34d399; border-color: rgba(52,211,153,0.18); }
+.status-pill.success .status-dot { background: #34d399; }
+.status-pill.pending { color: #fbbf24; border-color: rgba(251,191,36,0.18); }
+.status-pill.pending .status-dot { background: #fbbf24; }
+.status-pill.failed { color: #f87171; border-color: rgba(248,113,113,0.18); }
+.status-pill.failed .status-dot { background: #f87171; }
 
 /* ========== Theme Toggle ========== */
 .theme-toggle {

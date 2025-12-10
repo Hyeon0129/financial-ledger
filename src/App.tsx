@@ -2,8 +2,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   BarChart, Bar,
-  LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ComposedChart, Area, Line
 } from 'recharts';
 import type {
   Transaction, Category, Account, Budget, SavingsGoal, RecurringPayment,
@@ -16,15 +16,35 @@ import {
 } from './api';
 import './styles.css';
 
+
+
+
 // ========== Types ==========
 type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'recurring' | 'profile';
 
 // ========== Design Tokens (Charts & Icons) ==========
 // (unused palette removed)
 
+
+
+
+
 const Icons = {
   Plus: () => <span style={{ fontSize: 16, fontWeight: 600 }}>+</span>,
   Close: () => <span style={{ fontSize: 18, fontWeight: 300 }}>×</span>,
+};
+
+const getCardTheme = (_account: Account, index: number): string => {
+  // 카드 순서에 따라 테마를 순환 적용 (1번째는 업로드한 그린 디자인)
+  const themes = [
+    'card-theme-emerald',  // 업로드된 그린 톤
+    'card-theme-carbon',   // 다크 + 다크그레이
+    'card-theme-gold',     // 골드 그라디언트
+    'card-theme-slate',    // 블루 그레이 다크
+    'card-theme-midnight', // 딥 블루/그린 다크
+    'card-theme-obsidian', // 완전 다크
+  ];
+  return themes[index % themes.length];
 };
 
 // ========== Main App ==========
@@ -309,6 +329,10 @@ const DashboardView: React.FC<{
   const isDark = theme === 'dark';
   const axisColor = isDark ? '#d4d4d8' : '#999999';
   const gridColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  const tooltipBgDash = '#11151b';
+  const tooltipBorderDash = '#242a32';
+  const tooltipLabelDash = '#e2e7ef';
+  const tooltipTextDash = '#d6dce6';
   const totalIncome = stats?.income ?? 0;
   const totalExpense = stats?.expense ?? 0;
   const netRevenue = stats ? stats.balance : 0;
@@ -363,6 +387,19 @@ const DashboardView: React.FC<{
     return map;
   }, [transactions]);
 
+  const [cardPage, setCardPage] = useState(0);
+  const cardsPerPage = 3;
+  const totalCardPages = Math.max(1, Math.ceil(accounts.length / cardsPerPage));
+  const clampedCardPage = Math.min(cardPage, totalCardPages - 1);
+
+  const pagedAccounts = useMemo(
+    () => accounts.slice(clampedCardPage * cardsPerPage, clampedCardPage * cardsPerPage + cardsPerPage),
+    [accounts, clampedCardPage]
+  );
+
+  const handleCardPrev = () => setCardPage((p) => Math.max(0, p - 1));
+  const handleCardNext = () => setCardPage((p) => Math.min(totalCardPages - 1, p + 1));
+
   if (!stats) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
@@ -399,11 +436,12 @@ const DashboardView: React.FC<{
             </div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barGap={4} margin={{ left: -10, right: 10 }} barCategoryGap={10}>
+              <BarChart data={chartData} barGap={6} margin={{ left: -10, right: 10 }} barCategoryGap={14}>
                 <defs>
-                  <linearGradient id="dashboardExpenseGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#cfd2d7" />
-                    <stop offset="100%" stopColor="#4b5563" />
+                  <linearGradient id="barGreen3D" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3ce596" />
+                    <stop offset="45%" stopColor="#22c874" />
+                    <stop offset="100%" stopColor="#0d5d3c" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -420,19 +458,20 @@ const DashboardView: React.FC<{
                   tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} 
                 />
                 <Tooltip
-                  cursor={false}
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                   contentStyle={{
-                    background: 'rgba(20,20,22,0.92)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    background: tooltipBgDash,
+                    border: `1px solid ${tooltipBorderDash}`,
                     borderRadius: 12,
-                    color: '#f8fafc',
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.65)',
-                    padding: '10px 14px',
+                    color: tooltipTextDash,
+                    boxShadow: '0 14px 36px rgba(0,0,0,0.75)',
+                    padding: '12px 14px',
+                    minWidth: 180,
                   }}
-                  labelStyle={{ color: '#e5e7eb', fontWeight: 700 }}
+                  labelStyle={{ color: tooltipLabelDash, fontWeight: 700 }}
                   formatter={(value: number) => formatCurrency(value, currency)}
                 />
-                <Bar dataKey="지출" fill="url(#dashboardExpenseGradient)" radius={[6, 6, 0, 0]} activeBar={false} />
+                <Bar dataKey="지출" radius={[6, 6, 0, 0]} activeBar={false} fill="url(#barGreen3D)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -463,15 +502,21 @@ const DashboardView: React.FC<{
             <div className="metric-change positive">+60% This year</div>
           </div>
           <div className="card monthly-limit-card">
-            <div className="metric-title">Monthly Spending Limit</div>
-            <div className="progress-bar-wrapper">
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: totalBudget > 0 ? `${Math.min(100, (stats.expense / totalBudget) * 100)}%` : '0%' }}></div>
-              </div>
-              <div className="progress-labels">
-                <span>{formatCurrency(stats.expense, currency)}</span>
-                <span>{formatCurrency(totalBudget, currency)}</span>
-              </div>
+            <div className="wallet-header">
+              <div className="metric-title">Monthly Spending Limit</div>
+              <div className="wallet-amount">{formatCurrency(totalBudget, currency)}</div>
+            </div>
+            <div className="wallet-bar">
+              <div
+                className="wallet-bar-fill"
+                style={{
+                  width: totalBudget > 0 ? `${Math.min(100, (stats.expense / totalBudget) * 100)}%` : '0%',
+                }}
+              />
+            </div>
+            <div className="wallet-sub">
+              <span>Used {formatCurrency(stats.expense, currency)}</span>
+              <span>Remaining {formatCurrency(Math.max(0, totalBudget - stats.expense), currency)}</span>
             </div>
           </div>
         </div>
@@ -525,44 +570,58 @@ const DashboardView: React.FC<{
             <div>
               <div className="card-title">Your cards</div>
               <div className="card-subtitle">이번 달 카드 현황</div>
-                      </div>
+            </div>
             <button className="btn btn-sm" onClick={() => onNavigate('accounts')}>Manage</button>
           </div>
-          <div className="cards-list">
-            {accounts.length > 0 ? (
-              accounts.map((acc) => {
-                const usage = accountUsage[acc.id] || { spent: 0, income: 0 };
-                return (
-                  <div
-                    key={acc.id}
-                    className="bank-card real"
-                  >
-                    <div className="bank-card-top">
-                      <div className="bank-card-brand">{acc.name}</div>
-                      <div className="bank-card-chip">💳</div>
-                      </div>
-                    <div className="bank-card-balance">{formatCurrency(acc.balance, currency)}</div>
-                    <div className="bank-card-bottom">
-                      <div>
-                        <div className="bank-card-label">TYPE</div>
-                        <div className="bank-card-value">{acc.type.toUpperCase()}</div>
-                      </div>
-                      <div>
-                        <div className="bank-card-label">Spending this month</div>
-                        <div className="bank-card-value">{formatCurrency(usage.spent, currency)}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="empty-state" style={{ padding: 24, alignItems: 'flex-start' }}>
-                <div className="empty-state-text">등록된 카드가 없습니다.</div>
-                <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => onNavigate('accounts')}>
-                  카드 등록하기
-                </button>
-            </div>
-          )}
+          <div className="cards-stage">
+            <button className="cards-nav-btn edge left" onClick={handleCardPrev} disabled={clampedCardPage === 0}>‹</button>
+            <div className="cards-list">
+
+
+            {/* 카드 리스트 */}
+{pagedAccounts.length > 0 ? (
+  pagedAccounts.map((acc, index) => {
+    const usage = accountUsage[acc.id] || { spent: 0, income: 0 };
+    const globalIndex = clampedCardPage * cardsPerPage + index;
+    return (
+      <div
+        key={acc.id}
+        className={`bank-card real ${getCardTheme(acc, globalIndex)}`}
+      >
+        {/* 좌측 상단: 카드 이름만 표시 (칩 제거) */}
+        <div className="finance-card-title">{acc.name}</div>
+
+        {/* 하단: 금액 / 이번 달 사용 */}
+        <div className="finance-card-balance-wrap">
+          <div className="finance-card-balance">
+            {formatCurrency(acc.balance, currency)}
+          </div>
+          <div className="finance-card-sub">
+            이번 달 사용 {formatCurrency(usage.spent, currency)}
+          </div>
+        </div>
+
+        {/* 우측 하단 VISA 로고 */}
+        <div className="finance-card-logo" />
+      </div>
+    );
+  })
+) : (
+  <div className="empty-state" style={{ padding: 24, alignItems: 'flex-start' }}>
+    <div className="empty-state-text">등록된 카드가 없습니다.</div>
+    <button
+      className="btn btn-primary"
+      style={{ marginTop: 8 }}
+      onClick={() => onNavigate('accounts')}
+    >
+      카드 등록하기
+    </button>
+  </div>
+)}
+
+
+          </div>
+            <button className="cards-nav-btn edge right" onClick={handleCardNext} disabled={clampedCardPage >= totalCardPages - 1}>›</button>
           </div>
         </div>
 
@@ -1447,14 +1506,22 @@ const CategoryFormModal: React.FC<{
   onSave: () => void;
 }> = ({ categories, editingCategory, onClose, onSave }) => {
   const [name, setName] = useState(editingCategory?.name || '');
-  const [type, setType] = useState<'income' | 'expense'>(editingCategory?.type || 'expense');
+  const [type, setType] = useState<'income' | 'expense'>(
+    editingCategory?.type || 'expense'
+  );
   const [parentId, setParentId] = useState<string>(editingCategory?.parent_id || '');
   const [color, setColor] = useState(editingCategory?.color || '#007AFF');
   const [saving, setSaving] = useState(false);
 
   const colors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
-    '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
+    '#3B82F6',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#8B5CF6',
+    '#EC4899',
+    '#14B8A6',
+    '#F97316',
   ];
 
   const parentOptions = useMemo(
@@ -1496,93 +1563,161 @@ const CategoryFormModal: React.FC<{
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="modal-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-      <div>
-            <div className="panel-title">새 카테고리</div>
-            <div className="panel-sub">카테고리 정보를 입력해주세요</div>
-        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: 24,
+          }}
+        >
+          <div>
+            <div className="panel-title">
+              {editingCategory ? '카테고리 수정' : '새 카테고리'}
+            </div>
+            <div className="panel-sub">
+              {editingCategory
+                ? '카테고리 정보를 수정합니다'
+                : '수입/지출 카테고리를 추가합니다'}
+            </div>
+          </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
             <Icons.Close />
           </button>
-      </div>
+        </div>
 
         <form className="form" onSubmit={handleSubmit}>
+          {/* 이름 */}
           <div className="form-group">
-            <label className="form-label">이름</label>
+            <label className="form-label">카테고리 이름</label>
             <input
               className="form-input"
-              placeholder="카테고리 이름"
+              placeholder="예: 식비, 월급, 교통비"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">유형</label>
-            <select
-              className="form-select"
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as 'income' | 'expense');
-                setParentId('');
-                }}
+          {/* 타입 + 상위 카테고리 */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">구분</label>
+              <select
+                className="form-select"
+                value={type}
+                onChange={(e) =>
+                  setType(e.target.value as 'income' | 'expense')
+                }
               >
-              <option value="expense">지출</option>
-              <option value="income">수입</option>
-            </select>
-              </div>
-
-          <div className="form-group">
-            <label className="form-label">상위 카테고리 (선택)</label>
-            <select
-              className="form-select"
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-            >
-              <option value="">상위 없음 (대분류)</option>
-              {parentOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+                <option value="expense">지출</option>
+                <option value="income">수입</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">상위 카테고리 (선택)</label>
+              <select
+                className="form-select"
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                disabled={type === 'income'}
+              >
+                <option value="">없음</option>
+                {parentOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* 색상 선택 */}
           <div className="form-group">
             <label className="form-label">색상</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginBottom: 8,
+              }}
+            >
               {colors.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    border:
+                      color === c
+                        ? '2px solid #ffffff'
+                        : '1px solid rgba(0,0,0,0.08)',
+                    boxShadow:
+                      color === c
+                        ? '0 0 0 2px rgba(59,130,246,0.6)'
+                        : 'none',
                     background: c,
-                    border: color === c ? '2px solid #F9FAFB' : '1px solid rgba(148,163,184,0.5)',
                     cursor: 'pointer',
                   }}
                 />
               ))}
-              </div>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                style={{
+                  width: 40,
+                  height: 28,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-hover)',
+                  background: 'transparent',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+              />
             </div>
+          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
+          {/* 버튼 */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              marginTop: 8,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+              disabled={saving}
+            >
               취소
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '저장 중...' : '저장'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving}
+            >
+              {saving
+                ? '저장 중...'
+                : editingCategory
+                ? '수정 완료'
+                : '카테고리 추가'}
             </button>
           </div>
         </form>
-              </div>
-            </div>
-          );
+      </div>
+    </div>
+  );
 };
 
 // ========== Accounts View ==========
@@ -1797,25 +1932,35 @@ const ReportsView: React.FC<{
 
   const lineData = useMemo(() => {
     if (!stats) return [];
-    const daysInMonth = new Date(Number(stats.month.split('-')[0]), Number(stats.month.split('-')[1]), 0).getDate();
+    const daysInMonth = new Date(
+      Number(stats.month.split('-')[0]),
+      Number(stats.month.split('-')[1]),
+      0
+    ).getDate();
+
     const data: Array<{ day: number; income: number; expense: number }> = [];
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${stats.month}-${String(i).padStart(2, '0')}`;
-      const inc = stats.dailyTrend.filter(d => d.date === dateStr && d.type === 'income').reduce((s, d) => s + d.total, 0);
-      const exp = stats.dailyTrend.filter(d => d.date === dateStr && d.type === 'expense').reduce((s, d) => s + d.total, 0);
+      const inc = stats.dailyTrend
+        .filter((d) => d.date === dateStr && d.type === 'income')
+        .reduce((s, d) => s + d.total, 0);
+      const exp = stats.dailyTrend
+        .filter((d) => d.date === dateStr && d.type === 'expense')
+        .reduce((s, d) => s + d.total, 0);
       data.push({ day: i, income: inc, expense: exp });
     }
     return data;
   }, [stats]);
 
-  const axisColor = '#d4d4d8';
-  const gridColor = 'rgba(255,255,255,0.12)';
-  const tooltipBg = 'rgba(20, 20, 22, 0.92)';
-  const tooltipBorder = 'rgba(255,255,255,0.08)';
-  const tooltipLabel = '#f4f4f5';
-  const tooltipText = '#e5e7eb';
-  const incomeColor = '#5B6CF7';
-  const expenseColor = '#39D353';
+ 
+
+  const axisColor = '#7ccfa6';
+  const gridColor = 'rgba(46,232,156,0.18)';
+  const tooltipBg = '#11151b';
+  const tooltipBorder = '#242a32';
+  const tooltipLabel = '#e2e7ef';
+  const tooltipText = '#d6dce6';
+  const expenseColor = '#2ee48e';
 
   if (!stats) return <div className="loading-spinner" />;
 
@@ -1850,42 +1995,113 @@ const ReportsView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">Activity Summary</div>
-              <div className="card-subtitle">수입/지출 추이</div>
+              <div className="card-subtitle">지출 추이</div>
             </div>
           </div>
           <div style={{ height: 320 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ left: -10, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: axisColor, fontWeight: 500 }}
-                  tickFormatter={(v) => `${(v/10000).toFixed(0)}만`}
-                />
-                <Tooltip
-                  cursor={{ stroke: 'rgba(255,255,255,0.12)' }}
-                  contentStyle={{
-                    background: tooltipBg,
-                    border: `1px solid ${tooltipBorder}`,
-                    borderRadius: 12,
-                    color: tooltipText,
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.65)',
-                    padding: '10px 14px',
-                  }}
-                  labelStyle={{ color: tooltipLabel, fontWeight: 700 }}
-                  formatter={(value: number) => formatCurrency(value, currency)}
-                />
-                <Line type="monotone" dataKey="income" stroke={incomeColor} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
-                <Line type="monotone" dataKey="expense" stroke={expenseColor} strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={lineData}
+              margin={{ left: -10, right: 10, top: 10, bottom: 0 }}
+            >
+              {/* 영역 그라디언트 (아래로 자연스럽게 사라지게) */}
+              <defs>
+                <linearGradient id="activityArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
+                  <stop offset="50%" stopColor="#22c55e" stopOpacity={0.18} />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+
+              {/* ★ 그리드 제거: 가로/세로 실선 없음 */}
+              {/* CartesianGrid 삭제 */}
+
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 12, fill: axisColor, fontWeight: 500 }}
+                tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`}
+              />
+
+              {/* 세로 하이라이트 라인 + 유리글래스 툴팁 */}
+
+              
+              <Tooltip
+  cursor={{
+    stroke: 'rgba(94,234,212,0.7)',
+    strokeWidth: 1,
+    strokeDasharray: '4 6',
+  }}
+  content={({ active, payload, label }) => {
+    if (!active || !payload || payload.length === 0) return null;
+
+    const first = payload[0]; // 그냥 첫 번째 시리즈만 사용
+    if (!first || first.value == null) return null;
+
+    return (
+      <div
+        style={{
+          background: 'rgba(15,23,42,0.96)',
+          borderRadius: 14,
+          border: '1px solid rgba(148,163,184,0.35)',
+          boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
+          padding: '10px 12px',
+          color: '#d6dce6',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+        }}
+      >
+        <div
+          style={{
+            color: '#e2e7ef',
+            fontWeight: 600,
+            fontSize: 11,
+            marginBottom: 4,
+          }}
+        >
+          {label}일
+        </div>
+        <div style={{ fontSize: 12 }}>
+          expense : {formatCurrency(first.value as number, currency)}
+        </div>
+      </div>
+    );
+  }}
+/>
+
+              {/* 아래 채워지는 영역 */}
+              <Area
+                type="monotone"
+                dataKey="expense"
+                stroke="none"
+                fill="url(#activityArea)"
+                activeDot={false}
+              />
+
+              {/* ★ 더 얇은 네온 라인 */}
+              <Line
+                type="monotone"
+                dataKey="expense"
+                stroke={expenseColor}
+                strokeWidth={1.4}   // 기존 2.6 → 훨씬 얇게
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  fill: '#22c55e',
+                  strokeWidth: 0,
+                }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+
+
           </div>
         </div>
 
@@ -1900,9 +2116,10 @@ const ReportsView: React.FC<{
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={expenseByCategory.slice(0, 10)} layout="vertical" margin={{ left: 12, right: 12 }}>
                 <defs>
-                  <linearGradient id="reportsCategoryGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#d1d5db" />
-                    <stop offset="100%" stopColor="#4b5563" />
+                  <linearGradient id="reportsBar3D" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#3ce596" />
+                    <stop offset="45%" stopColor="#22c874" />
+                    <stop offset="100%" stopColor="#0d5d3c" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal vertical={false} />
@@ -1924,16 +2141,17 @@ const ReportsView: React.FC<{
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value, currency)}
                   contentStyle={{
-                    borderRadius: 8,
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-                    padding: '12px 16px',
+                    borderRadius: 12,
+                    boxShadow: '0 14px 36px rgba(0,0,0,0.75)',
+                    padding: '12px 14px',
                     background: tooltipBg,
                     border: `1px solid ${tooltipBorder}`,
                     color: tooltipText,
+                    minWidth: 180,
                   }}
-                  labelStyle={{ color: tooltipLabel, fontWeight: 600, marginBottom: 8 }}
+                  labelStyle={{ color: tooltipLabel, fontWeight: 700, marginBottom: 6 }}
                 />
-                <Bar dataKey="total" radius={[0, 6, 6, 0]} fill="url(#reportsCategoryGradient)" />
+                <Bar dataKey="total" radius={[0, 6, 6, 0]} fill="url(#reportsBar3D)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
