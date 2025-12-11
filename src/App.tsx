@@ -73,6 +73,7 @@ const App: React.FC = () => {
   }, [transactions, month]);
 
   const [stats, setStats] = useState<MonthlyStats | null>(null);
+  const [prevStats, setPrevStats] = useState<MonthlyStats | null>(null);
   const [yearlyStats, setYearlyStats] = useState<{ year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -123,46 +124,58 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
+  const prevMonthKey = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const prev = new Date(y, m - 2, 1);
+    return getMonthKey(prev);
+  }, [month]);
+
   // Load month-specific data
   useEffect(() => {
     const loadMonthData = async () => {
       try {
         const year = Number(month.split('-')[0]);
-        const [txs, bds, monthStats, yrStats] = await Promise.all([
+        const [txs, bds, monthStats, prevMonthStats, yrStats] = await Promise.all([
           transactionsApi.list({ month }),
           budgetsApi.list(),
           statsApi.monthly(month),
+          statsApi.monthly(prevMonthKey),
           statsApi.yearly(year),
         ]);
         setTransactions(normalizeTransactions(txs));
         setBudgets(bds);
         setStats(monthStats);
+        setPrevStats(prevMonthStats);
         setYearlyStats(yrStats);
       } catch (error) {
         console.error('Failed to load month data:', error);
       }
     };
     loadMonthData();
-  }, [month, normalizeTransactions]);
+  }, [month, normalizeTransactions, prevMonthKey]);
 
   // Refresh functions
   const refreshTransactions = useCallback(async () => {
     const txs = await transactionsApi.list({ month });
     setTransactions(normalizeTransactions(txs));
     const monthStats = await statsApi.monthly(month);
+    const prevMonthStats = await statsApi.monthly(prevMonthKey);
     const yrStats = await statsApi.yearly(Number(month.split('-')[0]));
     setStats(monthStats);
+    setPrevStats(prevMonthStats);
     setYearlyStats(yrStats);
-  }, [month, normalizeTransactions]);
+  }, [month, normalizeTransactions, prevMonthKey]);
 
   const refreshBudgets = useCallback(async () => {
     const bds = await budgetsApi.list();
     setBudgets(bds);
     const monthStats = await statsApi.monthly(month);
+    const prevMonthStats = await statsApi.monthly(prevMonthKey);
     const yrStats = await statsApi.yearly(Number(month.split('-')[0]));
     setStats(monthStats);
+    setPrevStats(prevMonthStats);
     setYearlyStats(yrStats);
-  }, [month]);
+  }, [month, prevMonthKey]);
 
   const refreshCategories = useCallback(async () => {
     const cats = await categoriesApi.list();
@@ -266,6 +279,7 @@ const App: React.FC = () => {
           {view === 'dashboard' && (
             <DashboardView 
               stats={stats}
+            prevStats={prevStats}
               transactions={transactions}
               budgets={budgets}
               savingsGoals={savingsGoals}
@@ -346,6 +360,7 @@ const App: React.FC = () => {
 // ========== Dashboard View ==========
 const DashboardView: React.FC<{
   stats: MonthlyStats | null;
+  prevStats: MonthlyStats | null;
   transactions: Transaction[];
   budgets: Budget[];
   savingsGoals: SavingsGoal[];
@@ -356,7 +371,7 @@ const DashboardView: React.FC<{
   month: string;
   onNavigate: (v: View) => void;
   theme: 'light' | 'dark';
-}> = ({ stats, transactions, budgets, currency, month, theme, accounts, onNavigate, savingsGoals }) => {
+}> = ({ stats, prevStats, transactions, budgets, currency, month, theme, accounts, onNavigate, savingsGoals }) => {
   const isDark = theme === 'dark';
   const axisColor = isDark ? '#d4d4d8' : '#999999';
   const gridColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
@@ -368,6 +383,53 @@ const DashboardView: React.FC<{
   const totalExpense = stats?.expense ?? 0;
   const netRevenue = stats ? stats.balance : 0;
   const totalBudget = budgets.reduce((sum: number, b: Budget) => sum + b.amount, 0);
+  const metricChanges = useMemo(() => {
+    const build = (current: number, previous: number | undefined) => {
+      if (previous == null) return null;
+      const diff = current - previous;
+      const pct = previous !== 0 ? (diff / previous) * 100 : null;
+      return { diff, pct };
+    };
+    return {
+      income: build(stats?.income ?? 0, prevStats?.income),
+      expense: build(stats?.expense ?? 0, prevStats?.expense),
+      balance: build(stats?.balance ?? 0, prevStats?.balance),
+      txCount: build(stats?.transactionCount ?? 0, prevStats?.transactionCount),
+    };
+  }, [stats, prevStats]);
+
+  const changeClass = (change: { diff: number } | null, invert = false) => {
+    if (!change) return '';
+    const positive = change.diff >= 0;
+    const isPositive = invert ? !positive : positive;
+    return isPositive ? 'positive' : 'negative';
+  };
+
+  const changeDisplay = (
+    change: { diff: number; pct: number | null } | null,
+    type: 'money' | 'count' = 'money'
+  ) => {
+    if (!change) return { pctText: '전월 데이터 없음', amountText: '', diff: null, pct: null };
+    const sign = change.diff >= 0 ? '+' : '-';
+    const pctText =
+      change.pct === null ? '신규' : `${sign}${Math.abs(change.pct).toFixed(0)}%`;
+    const amountText =
+      type === 'count'
+        ? `${sign}${Math.abs(change.diff)}건`
+        : `${sign}${formatCurrency(Math.abs(change.diff), currency)}`;
+    return { pctText, amountText, diff: change.diff, pct: change.pct };
+  };
+
+  const incomeChange = changeDisplay(metricChanges.income, 'money');
+  const expenseChange = changeDisplay(metricChanges.expense, 'money');
+  const balanceChange = changeDisplay(metricChanges.balance, 'money');
+  const txChange = changeDisplay(metricChanges.txCount, 'count');
+
+  const prevMonthLabel = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const prev = new Date(y, m - 2, 1);
+    return prev.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  }, [month]);
   // Daily trend chart data
   const chartData = useMemo(() => {
     if (!stats) return [];
@@ -434,6 +496,13 @@ const DashboardView: React.FC<{
 
 
   const [cardPage, setCardPage] = useState(0);
+  const [selectedMetric, setSelectedMetric] = useState<{
+    title: string;
+    current: number;
+    previous: number;
+    change: { pctText: string; amountText: string; diff: number | null; pct: number | null };
+    type: 'money' | 'count';
+  } | null>(null);
   const cardsPerPage = 3;
   const totalCardPages = Math.max(1, Math.ceil(accounts.length / cardsPerPage));
   const clampedCardPage = Math.min(cardPage, totalCardPages - 1);
@@ -458,14 +527,13 @@ const DashboardView: React.FC<{
     <>
       {/* First Row: Balance + Earnings Report */}
       <div className="dashboard-row">
-        <div className="card balance-card">
-          <div className="balance-hero">
-            <div className="balance-kicker">이번 달</div>
-            <div className="balance-hero-amount">{formatCurrency(stats.balance, currency)}</div>
-            <div className="balance-hero-sub">KRW 기준</div>
+        <div className="card balance-card premium-balance">
+          <div className="balance-hero compact">
+            <div className="balance-hero-label">이번 달 남은 돈</div>
+            <div className="balance-hero-amount main">{formatCurrency(stats.balance, currency)}</div>
           </div>
 
-          <div className="balance-breakdown sleek">
+          <div className="balance-breakdown sleek glassy">
             <div className="balance-row">
               <div className="balance-row-label">이번 달 수입</div>
               <div className="balance-row-value positive">{formatCurrency(totalIncome, currency)}</div>
@@ -538,25 +606,85 @@ const DashboardView: React.FC<{
       {/* Second Row: Metrics + Currencies + Transactions */}
       <div className="dashboard-row-2">
         <div className="metrics-grid">
-          <div className="card metric-card-small">
+        <div
+          className="card metric-card-small"
+          style={{ cursor: prevStats ? 'pointer' : 'default' }}
+          onClick={() => {
+            if (!prevStats) return;
+            setSelectedMetric({
+              title: 'Total Earnings',
+              current: stats.income,
+              previous: prevStats.income,
+              change: incomeChange,
+              type: 'money',
+            });
+          }}
+        >
             <div className="metric-title">Total Earnings</div>
             <div className="metric-value">{formatCurrency(totalIncome, currency)}</div>
-            <div className="metric-change positive">+6% This week</div>
+            <div className={`metric-change metric-change-row ${changeClass(metricChanges.income)}`}>
+              <span className="metric-change-main">{incomeChange.pctText}</span>
             </div>
-          <div className="card metric-card-small metric-spending">
+          </div>
+        <div
+          className="card metric-card-small metric-spending"
+          style={{ cursor: prevStats ? 'pointer' : 'default' }}
+          onClick={() => {
+            if (!prevStats) return;
+            setSelectedMetric({
+              title: 'Total Spending',
+              current: stats.expense,
+              previous: prevStats.expense,
+              change: expenseChange,
+              type: 'money',
+            });
+          }}
+        >
             <div className="metric-title">Total Spending</div>
             <div className="metric-value">{formatCurrency(totalExpense, currency)}</div>
-            <div className="metric-change negative">-16% This week</div>
+            <div className={`metric-change metric-change-row ${changeClass(metricChanges.expense, true)}`}>
+              <span className="metric-change-main">{expenseChange.pctText}</span>
+            </div>
           </div>
-          <div className="card metric-card-small">
+        <div
+          className="card metric-card-small"
+          style={{ cursor: prevStats ? 'pointer' : 'default' }}
+          onClick={() => {
+            if (!prevStats) return;
+            setSelectedMetric({
+              title: 'Net Balance',
+              current: stats.balance,
+              previous: prevStats.balance,
+              change: balanceChange,
+              type: 'money',
+            });
+          }}
+        >
             <div className="metric-title">Net Balance</div>
             <div className="metric-value">{formatCurrency(netRevenue, currency)}</div>
-            <div className="metric-change positive">+2% This week</div>
+            <div className={`metric-change metric-change-row ${changeClass(metricChanges.balance)}`}>
+              <span className="metric-change-main">{balanceChange.pctText}</span>
+            </div>
           </div>
-          <div className="card metric-card-small">
+        <div
+          className="card metric-card-small"
+          style={{ cursor: prevStats ? 'pointer' : 'default' }}
+          onClick={() => {
+            if (!prevStats) return;
+            setSelectedMetric({
+              title: 'Transactions',
+              current: stats.transactionCount,
+              previous: prevStats.transactionCount,
+              change: txChange,
+              type: 'count',
+            });
+          }}
+        >
             <div className="metric-title">Transactions</div>
             <div className="metric-value">{stats.transactionCount.toLocaleString()} 건</div>
-            <div className="metric-change positive">+60% This year</div>
+            <div className={`metric-change metric-change-row ${changeClass(metricChanges.txCount)}`}>
+              <span className="metric-change-main">{txChange.pctText}</span>
+            </div>
           </div>
           <div className="card monthly-limit-card">
             <div className="wallet-header">
@@ -987,6 +1115,55 @@ const TransactionsView: React.FC<{
           onRefresh();
         }}
         />
+      )}
+
+      {selectedMetric && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedMetric(null)}>
+          <div className="modal-content" style={{ maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div className="panel-title">{selectedMetric.title}</div>
+                <div className="panel-sub">{prevMonthLabel} → {month}</div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setSelectedMetric(null)}>
+                <Icons.Close />
+              </button>
+            </div>
+
+            <div className="transactions-table-lite manage-table" style={{ padding: 12, marginBottom: 12 }}>
+              <div className="tx-row manage-head" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>구분</div>
+                <div className="tx-col-amount" style={{ justifyContent: 'flex-end' }}>값</div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{prevMonthLabel}</div>
+                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
+                  {selectedMetric.type === 'count'
+                    ? `${selectedMetric.previous.toLocaleString()} 건`
+                    : formatCurrency(selectedMetric.previous, currency)}
+                </div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{month}</div>
+                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
+                  {selectedMetric.type === 'count'
+                    ? `${selectedMetric.current.toLocaleString()} 건`
+                    : formatCurrency(selectedMetric.current, currency)}
+                </div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start', fontWeight: 700 }}>증감</div>
+                <div className={`tx-amount tx-col-amount ${changeClass({ diff: selectedMetric.change.diff ?? 0 })}`} style={{ justifyContent: 'flex-end', fontWeight: 700 }}>
+                  {selectedMetric.change.pctText} / {selectedMetric.change.amountText || formatCurrency(selectedMetric.change.diff ?? 0, currency)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-primary" onClick={() => setSelectedMetric(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
@@ -2087,28 +2264,45 @@ const ReportsView: React.FC<{
 
  
 
-  const axisColor = '#7ccfa6';
-  const gridColor = 'rgba(46,232,156,0.18)';
-  const tooltipBg = '#11151b';
-  const tooltipBorder = '#242a32';
-  const tooltipLabel = '#e2e7ef';
-  const tooltipText = '#d6dce6';
-  const expenseColor = '#2ee48e';
+  const axisColor = '#9ef3c5';
+  const axisColorGeneral = '#94a3b8';
+  const tooltipBg = '#0c1117';
+  const tooltipBorder = 'rgba(74,222,128,0.24)';
+  const tooltipLabel = '#e2e8f0';
+  const tooltipText = '#cbd5e1';
+  const expenseColor = '#22d3a6';
+  const matrixBarDark = '#0f172a';
+  const matrixBarLight = '#8bffd6';
+
+  const yearForTable = stats ? (yearlyStats?.year ?? Number(stats.month.split('-')[0])) : new Date().getFullYear();
+  const monthKeys = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => `${yearForTable}-${String(i + 1).padStart(2, '0')}`),
+    [yearForTable]
+  );
+  const yearlyCombined = useMemo(() => {
+    if (!stats) return [];
+    const yearlyExpense = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'expense');
+    const yearlyIncome = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'income');
+    return monthKeys.map((m) => {
+      const exp = yearlyExpense.find((e) => e.month === m)?.total || 0;
+      const inc = yearlyIncome.find((i) => i.month === m)?.total || 0;
+      return { month: m.split('-')[1], expense: exp, income: inc };
+    });
+  }, [monthKeys, yearlyStats, stats]);
 
   if (!stats) return <div className="loading-spinner" />;
 
   const topExpense = expenseByCategory[0];
-  const yearlyExpense = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'expense');
-  const yearlyIncome = (yearlyStats?.monthlyTrend || []).filter((m) => m.type === 'income');
-  const yearlyCombined = yearlyExpense.map((e) => ({
-    month: e.month,
-    expense: e.total,
-    income: yearlyIncome.find((i) => i.month === e.month)?.total || 0,
-  }));
 
   return (
     <div className="reports-stack">
-      <div className="card-grid card-grid-3">
+      <div
+        className="card-grid"
+        style={{
+          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+          gridAutoRows: '1fr',
+        }}
+      >
         <div className="card">
           <div className="card-title">이번 달 수입</div>
           <div className="card-value">{formatCurrency(stats.income, currency)}</div>
@@ -2141,117 +2335,54 @@ const ReportsView: React.FC<{
       </div>
 
       <div className="reports-chart-grid">
+        {/* 1행: Activity Summary & 연간 추이 */}
         <div className="card" style={{ padding: 24 }}>
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">Activity Summary</div>
-              
             </div>
           </div>
           <div style={{ height: 320 }}>
-
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
-              data={lineData}
-              margin={{ left: -10, right: 10, top: 10, bottom: 0 }}
-            >
-              {/* 영역 그라디언트 (아래로 자연스럽게 사라지게) */}
-              <defs>
-                <linearGradient id="activityArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
-                  <stop offset="50%" stopColor="#22c55e" stopOpacity={0.18} />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-
-              {/* ★ 그리드 제거: 가로/세로 실선 없음 */}
-              {/* CartesianGrid 삭제 */}
-
-              <XAxis
-                dataKey="day"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 12, fill: axisColor, fontWeight: 500 }}
-                tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`}
-              />
-
-              {/* 세로 하이라이트 라인 + 유리글래스 툴팁 */}
-
-              
-              <Tooltip
-  cursor={{
-    stroke: 'rgba(94,234,212,0.7)',
-    strokeWidth: 1,
-    strokeDasharray: '4 6',
-  }}
-  content={({ active, payload, label }) => {
-    if (!active || !payload || payload.length === 0) return null;
-
-    const first = payload[0]; // 그냥 첫 번째 시리즈만 사용
-    if (!first || first.value == null) return null;
-
-    return (
-      <div
-        style={{
-          background: 'rgba(15,23,42,0.96)',
-          borderRadius: 14,
-          border: '1px solid rgba(148,163,184,0.35)',
-          boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
-          padding: '10px 12px',
-          color: '#d6dce6',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-        }}
-      >
-        <div
-          style={{
-            color: '#e2e7ef',
-            fontWeight: 600,
-            fontSize: 11,
-            marginBottom: 4,
-          }}
-        >
-          {label}일
-        </div>
-        <div style={{ fontSize: 12 }}>
-          expense : {formatCurrency(first.value as number, currency)}
-        </div>
-      </div>
-    );
-  }}
-/>
-
-              {/* 아래 채워지는 영역 */}
-              <Area
-                type="monotone"
-                dataKey="expense"
-                stroke="none"
-                fill="url(#activityArea)"
-                activeDot={false}
-              />
-
-              {/* ★ 더 얇은 네온 라인 */}
-              <Line
-                type="monotone"
-                dataKey="expense"
-                stroke={expenseColor}
-                strokeWidth={1.4}   // 기존 2.6 → 훨씬 얇게
-                dot={false}
-                activeDot={{
-                  r: 4,
-                  fill: '#22c55e',
-                  strokeWidth: 0,
-                }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-
-
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={lineData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="activityArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
+                    <stop offset="50%" stopColor="#22c55e" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: axisColor, fontWeight: 500 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                <Tooltip
+                  cursor={false}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const first = payload[0];
+                    if (!first || first.value == null) return null;
+                    return (
+                      <div
+                        style={{
+                          background: 'rgba(12,17,23,0.96)',
+                          borderRadius: 14,
+                          border: '1px solid rgba(148,163,184,0.35)',
+                          boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
+                          padding: '10px 12px',
+                          color: '#d6dce6',
+                          backdropFilter: 'blur(14px)',
+                          WebkitBackdropFilter: 'blur(14px)',
+                        }}
+                      >
+                        <div style={{ color: '#e2e7ef', fontWeight: 600, fontSize: 11, marginBottom: 4 }}>{label}일</div>
+                        <div style={{ fontSize: 12 }}>expense : {formatCurrency(first.value as number, currency)}</div>
+                      </div>
+                    );
+                  }}
+                />
+                <Area type="monotone" dataKey="expense" stroke="none" fill="url(#activityArea)" activeDot={false} />
+                <Line type="monotone" dataKey="expense" stroke={expenseColor} strokeWidth={1.4} dot={false} activeDot={{ r: 4, fill: '#22c55e', strokeWidth: 0 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -2259,16 +2390,34 @@ const ReportsView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">연간 지출/수입 추이</div>
-              <div className="card-subtitle">{yearlyStats ? `${yearlyStats.year}년` : ''}</div>
+              <div className="card-subtitle">{yearlyStats ? `${yearForTable}년` : ''}</div>
             </div>
           </div>
           <div style={{ height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={yearlyCombined} margin={{ left: -10, right: 10, top: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <ComposedChart data={yearlyCombined} margin={{ left: -8, right: 8, top: 10 }}>
+                <defs>
+                  <linearGradient id="yearExpGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={matrixBarLight} />
+                    <stop offset="45%" stopColor="#1f2937" />
+                    <stop offset="100%" stopColor={matrixBarDark} />
+                  </linearGradient>
+                  <linearGradient id="yearIncGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a7f3d0" />
+                    <stop offset="45%" stopColor="#1f2937" />
+                    <stop offset="100%" stopColor="#0b1220" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(74,222,128,0.08)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fill: axisColorGeneral, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis
+                  tick={{ fill: axisColorGeneral, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `${Math.round(v / 10000)}만`}
+                />
                 <Tooltip
+                  cursor={false}
                   contentStyle={{
                     background: tooltipBg,
                     border: `1px solid ${tooltipBorder}`,
@@ -2277,15 +2426,17 @@ const ReportsView: React.FC<{
                     boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
                   }}
                   labelStyle={{ color: tooltipLabel, fontWeight: 700 }}
-                  formatter={(v: number, n) => [formatCurrency(v, currency), n]}
+                  formatter={(v: number, n) => [formatCurrency(v, currency), n === 'expense' ? '지출' : '수입']}
+                  labelFormatter={(l) => `${l}월`}
                 />
-                <Bar dataKey="expense" fill="#f87171" radius={[6, 6, 0, 0]} />
-                <Line dataKey="income" stroke="#22c55e" strokeWidth={2} dot={false} />
+                <Bar dataKey="expense" fill="url(#yearExpGrad)" radius={[10, 10, 0, 0]} />
+                <Bar dataKey="income" fill="url(#yearIncGrad)" radius={[10, 10, 0, 0]} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
 
+        {/* 2행: 지출 카테고리 분석 + 우측 월별 테이블 */}
         <div className="card" style={{ padding: 24 }}>
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
@@ -2303,13 +2454,13 @@ const ReportsView: React.FC<{
                     <stop offset="100%" stopColor="#0d5d3c" />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(74,222,128,0.08)" horizontal vertical={false} />
                 <XAxis
                   type="number"
                   tickFormatter={(v) => `${(v/10000).toFixed(0)}만`}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fontWeight: 500, fill: axisColor }}
+                  tick={{ fontSize: 12, fontWeight: 500, fill: axisColorGeneral }}
                 />
                 <YAxis
                   type="category"
@@ -2317,24 +2468,53 @@ const ReportsView: React.FC<{
                   width={120}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 13, fontWeight: 600, fill: axisColor }}
+                  tick={{ fontSize: 13, fontWeight: 600, fill: axisColorGeneral }}
                 />
                 <Tooltip
-                  formatter={(value: number) => formatCurrency(value, currency)}
+                  cursor={false}
                   contentStyle={{
-                    borderRadius: 12,
-                    boxShadow: '0 14px 36px rgba(0,0,0,0.75)',
-                    padding: '12px 14px',
                     background: tooltipBg,
                     border: `1px solid ${tooltipBorder}`,
                     color: tooltipText,
-                    minWidth: 180,
+                    borderRadius: 12,
+                    boxShadow: '0 18px 45px rgba(0,0,0,0.85)',
                   }}
                   labelStyle={{ color: tooltipLabel, fontWeight: 700, marginBottom: 6 }}
+                  formatter={(value: number) => formatCurrency(value, currency)}
                 />
                 <Bar dataKey="total" radius={[0, 6, 6, 0]} fill="url(#reportsBar3D)" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ width: '100%', minWidth: 260 }}>
+          <div className="transactions-table-lite manage-table" style={{ padding: 8 }}>
+            <div className="tx-row manage-head" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+              <div className="tx-col-label" style={{ justifyContent: 'center' }}>월</div>
+              <div className="tx-col-amount" style={{ justifyContent: 'flex-end', textAlign: 'right' }}>수입</div>
+              <div className="tx-col-amount" style={{ justifyContent: 'flex-end', textAlign: 'right' }}>지출</div>
+            </div>
+            {yearlyCombined.map((m, idx) => (
+              <div key={idx} className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'center' }}>{Number(m.month)}월</div>
+                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end', textAlign: 'right' }}>
+                  {formatCurrency(m.income, currency)}
+                </div>
+                <div className="tx-amount tx-col-amount negative" style={{ justifyContent: 'flex-end', textAlign: 'right' }}>
+                  {formatCurrency(m.expense, currency)}
+                </div>
+              </div>
+            ))}
+            <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="tx-col-label" style={{ justifyContent: 'center', fontWeight: 700 }}>합계</div>
+              <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end', textAlign: 'right', fontWeight: 700 }}>
+                {formatCurrency(yearlyCombined.reduce((s, m) => s + m.income, 0), currency)}
+              </div>
+              <div className="tx-amount tx-col-amount negative" style={{ justifyContent: 'flex-end', textAlign: 'right', fontWeight: 700 }}>
+                {formatCurrency(yearlyCombined.reduce((s, m) => s + m.expense, 0), currency)}
+              </div>
+            </div>
           </div>
         </div>
       </div>
