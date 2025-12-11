@@ -383,7 +383,6 @@ const App: React.FC = () => {
               onRefresh={refreshRecurring}
             />
           )}
-      {view === 'profile' && <ProfileView />}
         </section>
       </main>
       </div>
@@ -3482,70 +3481,6 @@ const RecurringFormModal: React.FC<{
       </div>
     </div>
   );
-};
-
-// ========== Profile View ==========
-const ProfileView: React.FC = () => {
-  return (
-    <div className="panel" style={{ gridTemplateColumns: '1fr 1fr' }}>
-      <div className="panel-main">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">프로필</div>
-            <div className="panel-sub">계정 정보를 관리합니다</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 32 }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: 24,
-            background: 'linear-gradient(135deg, #007AFF, #5AC8FA)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32, color: 'white',
-          }}>
-            👤
-          </div>
-          <div>
-            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>사용자</h2>
-            <p style={{ color: 'var(--text-tertiary)' }}>demo@example.com</p>
-          </div>
-        </div>
-
-        <form className="form">
-          <div className="form-group">
-            <label className="form-label">이름</label>
-            <input className="form-input" defaultValue="사용자" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">이메일</label>
-            <input className="form-input" defaultValue="demo@example.com" disabled />
-          </div>
-          <button type="button" className="btn btn-primary">프로필 저장</button>
-        </form>
-      </div>
-
-      <div className="panel-side">
-        <div className="panel-header">
-          <div>
-            <div className="panel-title">보안</div>
-            <div className="panel-sub">계정 보안 설정</div>
-          </div>
-        </div>
-
-        <div className="settings-list">
-          <button className="btn" style={{ width: '100%', justifyContent: 'flex-start' }}>
-            비밀번호 변경
-          </button>
-          <button className="btn" style={{ width: '100%', justifyContent: 'flex-start' }}>
-            2단계 인증 설정
-          </button>
-          <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'flex-start' }}>
-            계정 삭제
-          </button>
-        </div>
-      </div>
-    </div>
-);
 };
 
 export default App;

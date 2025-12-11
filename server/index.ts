@@ -3,6 +3,18 @@ import cors from 'cors';
 import { db } from './db/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
+// Basic transaction shape for type safety in this file
+type TransactionRow = {
+  id: string;
+  user_id: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  category_id: string | null;
+  account_id: string | null;
+  date: string;
+  memo: string | null;
+};
+
 const app = express();
 const PORT = 3001;
 
@@ -98,15 +110,15 @@ const processLoans = () => {
     INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
     VALUES (?, ?, 'expense', ?, ?, ?, ?, ?)
   `);
-const existingTx = db.prepare(`
-  SELECT id FROM transactions 
-  WHERE user_id = ? AND memo = ? AND date = ? AND account_id = ?
-`);
-// Broad duplicate detector for past 상환 기록 (old/new memo 형태 포함)
-const existingTxLoanDay = db.prepare(`
-  SELECT id FROM transactions 
-  WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '[대출상환%'
-`);
+  const existingTx = db.prepare(`
+    SELECT id FROM transactions 
+    WHERE user_id = ? AND memo = ? AND date = ? AND account_id = ?
+  `);
+  // Broad duplicate detector for past 상환 기록 (old/new memo 형태 포함)
+  const existingTxLoanDay = db.prepare(`
+    SELECT id, memo FROM transactions 
+    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '[대출상환%'
+  `);
 
   loans.forEach((loan) => {
     const dueDay = Math.min(28, Math.max(1, loan.monthly_due_day || 1));
@@ -148,11 +160,16 @@ const existingTxLoanDay = db.prepare(`
       }
 
       if (payment > 0) {
-        const memo = `[대출상환] ${loan.id}:${paidMonths + 1}/${loan.term_months}`;
+        // 사용자 지정 대출명을 메모에 노출하되, 날짜/계좌 기반 중복 검증은 유지
+        const memo = `[대출상환] ${loan.name}:${paidMonths + 1}/${loan.term_months}`;
         const dupExact = existingTx.get(DEMO_USER_ID, memo, nextDue, loan.account_id);
-        const dupLoose = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id);
-        const isDup = dupExact || dupLoose;
-        if (!isDup) {
+        const dupLoose = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id) as { id: string; memo: string } | undefined;
+        if (dupExact) {
+          // 동일 메모가 이미 존재하면 새로 만들지 않음
+        } else if (dupLoose?.id) {
+          // 이전 버전으로 생성된 메모(ID 기반 등)를 최신 포맷으로 교체
+          db.prepare(`UPDATE transactions SET memo = ? WHERE id = ?`).run(memo, dupLoose.id);
+        } else {
           insertTx.run(uuidv4(), DEMO_USER_ID, payment, loan.category_id || null, loan.account_id, nextDue, memo);
           adjustAccountBalance(loan.account_id, -payment);
         }
@@ -180,10 +197,6 @@ const existingTxLoanDay = db.prepare(`
 app.get('/api/transactions', (req, res) => {
   processLoans();
   const { month, type, category_id } = req.query;
-  // Cleanup any legacy auto-generated recurring transactions and skip auto-generation
-  if (month) {
-    db.prepare(`DELETE FROM transactions WHERE user_id = ? AND memo LIKE '[자동] %'`).run(DEMO_USER_ID);
-  }
   
   let query = `
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -240,7 +253,7 @@ app.put('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
   const { type, amount, category_id, account_id, date, memo } = req.body;
 
-  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as Transaction | undefined;
+  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as TransactionRow | undefined;
   if (!existing) return res.status(404).send();
 
   // revert old balance
@@ -270,7 +283,7 @@ app.put('/api/transactions/:id', (req, res) => {
 
 app.delete('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
-  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as Transaction | undefined;
+  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as TransactionRow | undefined;
   if (existing) {
     if (existing.type === 'income') adjustAccountBalance(existing.account_id, -existing.amount);
     else if (existing.type === 'expense') adjustAccountBalance(existing.account_id, existing.amount);
