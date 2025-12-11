@@ -459,6 +459,11 @@ const DashboardView: React.FC<{
     const prev = new Date(y, m - 2, 1);
     return prev.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
   }, [month]);
+  const currentMonthLabel = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const cur = new Date(y, m - 1, 1);
+    return cur.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  }, [month]);
   // Daily trend chart data
   const chartData = useMemo(() => {
     if (!stats) return [];
@@ -653,6 +658,7 @@ const DashboardView: React.FC<{
             <div className="metric-value">{formatCurrency(totalIncome, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.income)}`}>
               <span className="metric-change-main">{incomeChange.pctText}</span>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 12, marginLeft: 6 }}>저번달 대비</span>
             </div>
           </div>
         <div
@@ -673,6 +679,7 @@ const DashboardView: React.FC<{
             <div className="metric-value">{formatCurrency(totalExpense, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.expense, true)}`}>
               <span className="metric-change-main">{expenseChange.pctText}</span>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 12, marginLeft: 6 }}>저번달 대비</span>
             </div>
           </div>
         <div
@@ -693,6 +700,7 @@ const DashboardView: React.FC<{
             <div className="metric-value">{formatCurrency(netRevenue, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.balance)}`}>
               <span className="metric-change-main">{balanceChange.pctText}</span>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 12, marginLeft: 6 }}>저번달 대비</span>
             </div>
           </div>
         <div
@@ -713,6 +721,7 @@ const DashboardView: React.FC<{
             <div className="metric-value">{stats.transactionCount.toLocaleString()} 건</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.txCount)}`}>
               <span className="metric-change-main">{txChange.pctText}</span>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 12, marginLeft: 6 }}>저번달 대비</span>
             </div>
           </div>
           <div className="card monthly-limit-card">
@@ -946,7 +955,7 @@ const DashboardView: React.FC<{
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <div className="panel-title">{selectedMetric.title}</div>
-                <div className="panel-sub">{prevMonthLabel} → {month}</div>
+                <div className="panel-sub">{prevMonthLabel} → {currentMonthLabel}</div>
               </div>
               <button className="btn btn-ghost btn-icon" onClick={() => setSelectedMetric(null)}>
                 <Icons.Close />
@@ -967,7 +976,7 @@ const DashboardView: React.FC<{
                 </div>
               </div>
               <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{month}</div>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{currentMonthLabel}</div>
                 <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
                   {selectedMetric.type === 'count'
                     ? `${selectedMetric.current.toLocaleString()} 건`
@@ -976,8 +985,9 @@ const DashboardView: React.FC<{
               </div>
               <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="tx-col-label" style={{ justifyContent: 'flex-start', fontWeight: 700 }}>증감</div><br/>
-                <div className={`tx-amount tx-col-amount ${changeClass({ diff: selectedMetric.change.diff ?? 0 })}`} style={{ justifyContent: 'flex-end', fontWeight: 700 }}>
-                  {selectedMetric.change.pctText}  {selectedMetric.change.amountText || formatCurrency(selectedMetric.change.diff ?? 0, currency)}
+                <div className={`tx-amount tx-col-amount ${changeClass({ diff: selectedMetric.change.diff ?? 0 })}`} style={{ justifyContent: 'flex-start', alignItems: 'flex-start', flexDirection: 'column', gap: 6, fontWeight: 700, textAlign: 'left' }}>
+                  <span>{selectedMetric.change.pctText}</span><br/>
+                  <span>{(selectedMetric.change.amountText || formatCurrency(selectedMetric.change.diff ?? 0, currency)).replace(/^\+/, '')}</span>
                 </div>
               </div>
             </div>
