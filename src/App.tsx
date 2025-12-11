@@ -919,7 +919,6 @@ const DashboardView: React.FC<{
             ) : (
               <div className="tx-row" style={{ justifyContent: 'center' }}>
                 <div className="tx-main" style={{ justifyContent: 'center' }}>
-                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>저축 목표가 없습니다.</div>
                 </div>
                 <div className="tx-date" />
                 <div className="tx-amount" />
