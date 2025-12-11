@@ -88,9 +88,6 @@ type LoanRow = {
 
 const processLoans = () => {
   const today = formatYMD(new Date());
-  const currentYear = String(new Date().getFullYear());
-  // Clean incorrect/old generated loan repayments for this year (Jan~Dec)
-  db.prepare(`DELETE FROM transactions WHERE user_id = ? AND memo LIKE '[대출상환]%' AND strftime('%Y', date) = ?`).run(DEMO_USER_ID, currentYear);
   const loans = db.prepare(`SELECT * FROM loans WHERE user_id = ?`).all(DEMO_USER_ID) as LoanRow[];
   const updateStmt = db.prepare(`
     UPDATE loans 
@@ -101,20 +98,39 @@ const processLoans = () => {
     INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
     VALUES (?, ?, 'expense', ?, ?, ?, ?, ?)
   `);
+const existingTx = db.prepare(`
+  SELECT id FROM transactions 
+  WHERE user_id = ? AND memo = ? AND date = ? AND account_id = ?
+`);
+// Broad duplicate detector for past 상환 기록 (old/new memo 형태 포함)
+const existingTxLoanDay = db.prepare(`
+  SELECT id FROM transactions 
+  WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '[대출상환%'
+`);
 
   loans.forEach((loan) => {
     const dueDay = Math.min(28, Math.max(1, loan.monthly_due_day || 1));
     const monthlyRate = loan.interest_rate / 100 / 12;
     const isInterestOnly = loan.repayment_type === 'interest_only';
     const isPrincipalEqual = loan.repayment_type === 'principal_equal';
-    const monthlyPayment = calcMonthlyPayment(loan.principal, loan.interest_rate, loan.term_months, loan.repayment_type);
-
-    let remaining = loan.principal;
-    let paidMonths = 0;
+    let remaining = loan.remaining_principal ?? loan.principal;
+    let paidMonths = loan.paid_months ?? 0;
+    // nextDue를 start_date 기준 paidMonths만큼 전진해 재계산
     let nextDue = getFirstDueDate(loan.start_date, dueDay);
+    for (let i = 0; i < paidMonths && nextDue; i++) {
+      nextDue = addMonthsKeepDay(nextDue, dueDay);
+    }
     const stopDate = loan.settled_at ? formatYMD(toDate(loan.settled_at)) : today;
 
+    // 남은 기간/금액으로 월 상환액 재계산
+    const remainingMonths = Math.max(loan.term_months - paidMonths, 1);
+    const monthlyPayment = calcMonthlyPayment(Math.max(remaining, 0), loan.interest_rate, remainingMonths, loan.repayment_type);
+
     while (nextDue && paidMonths < loan.term_months && nextDue <= stopDate) {
+      if (remaining <= 0) {
+        nextDue = null;
+        break;
+      }
       const interestPortion = Math.round(remaining * monthlyRate);
       let principalPortion = 0;
       let payment = 0;
@@ -132,25 +148,29 @@ const processLoans = () => {
       }
 
       if (payment > 0) {
-        const memo = `[대출상환] ${loan.name} ${paidMonths + 1}/${loan.term_months}`;
-        insertTx.run(uuidv4(), DEMO_USER_ID, payment, loan.category_id || null, loan.account_id, nextDue, memo);
+        const memo = `[대출상환] ${loan.id}:${paidMonths + 1}/${loan.term_months}`;
+        const dupExact = existingTx.get(DEMO_USER_ID, memo, nextDue, loan.account_id);
+        const dupLoose = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id);
+        const isDup = dupExact || dupLoose;
+        if (!isDup) {
+          insertTx.run(uuidv4(), DEMO_USER_ID, payment, loan.category_id || null, loan.account_id, nextDue, memo);
+          adjustAccountBalance(loan.account_id, -payment);
+        }
+        // 항상 원금 감소/스케줄 진행
+        if (!isInterestOnly) {
+          remaining = Math.max(0, remaining - principalPortion);
+        }
+        paidMonths += 1;
+        nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue, dueDay);
+        continue;
       }
 
-      if (!isInterestOnly) {
-        remaining = Math.max(0, remaining - principalPortion);
-      }
-
+      // payment가 0이면 스케줄만 진행
       paidMonths += 1;
       nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue, dueDay);
     }
 
-    let finalRemaining = isInterestOnly ? loan.principal : remaining;
-    if (loan.settled_at && stopDate <= today) {
-      finalRemaining = 0;
-      paidMonths = loan.term_months;
-      nextDue = null;
-    }
-
+    const finalRemaining = Math.max(0, remaining);
     updateStmt.run(finalRemaining, paidMonths, nextDue, monthlyPayment, loan.id);
   });
 };
@@ -473,18 +493,45 @@ app.put('/api/loans/:id', (req, res) => {
   res.json(loan);
 });
 
-// Settle (payoff) a loan: stop future generation from the given date
+// Settle (payoff) a loan: stop future generation from the given date, create payoff transaction
 app.put('/api/loans/:id/settle', (req, res) => {
   const { id } = req.params;
-  const { settled_at } = req.body as { settled_at?: string };
+  const { settled_at, amount, account_id } = req.body as { settled_at?: string; amount?: number; account_id?: string };
   if (!settled_at) return res.status(400).json({ error: 'settled_at required' });
   const loan = db.prepare(`SELECT * FROM loans WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as LoanRow | undefined;
   if (!loan) return res.status(404).send();
+
+  const payAmount = Math.max(0, amount ?? loan.remaining_principal);
+  const payAccount = account_id || loan.account_id;
+  if (payAmount > 0 && payAccount) {
+    const memo = `[대출상환완료] ${loan.name}`;
+    const txId = uuidv4();
+    db.prepare(`
+      INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
+      VALUES (?, ?, 'expense', ?, ?, ?, ?, ?)
+    `).run(txId, DEMO_USER_ID, payAmount, loan.category_id || null, payAccount, settled_at, memo);
+    adjustAccountBalance(payAccount, -payAmount);
+  }
+
+  const remaining = Math.max(0, loan.remaining_principal - payAmount);
+  const isCleared = remaining <= 0.0001;
+  const remainingMonths = Math.max(loan.term_months - loan.paid_months, 1);
+  const nextDue = isCleared ? null : addMonthsKeepDay(settled_at, loan.monthly_due_day);
+  const newMonthly = isCleared ? 0 : calcMonthlyPayment(remaining, loan.interest_rate, remainingMonths, loan.repayment_type);
+
   db.prepare(`
     UPDATE loans
-    SET settled_at = ?, remaining_principal = 0, next_due_date = NULL, paid_months = term_months
+    SET settled_at = ?, remaining_principal = ?, next_due_date = ?, paid_months = ?, monthly_payment = ?
     WHERE id = ? AND user_id = ?
-  `).run(settled_at, id, DEMO_USER_ID);
+  `).run(
+    settled_at,
+    isCleared ? 0 : remaining,
+    nextDue,
+    isCleared ? loan.term_months : loan.paid_months,
+    newMonthly,
+    id,
+    DEMO_USER_ID
+  );
 
   const updated = db.prepare(`
     SELECT l.*, a.name as account_name, c.name as category_name, c.color as category_color

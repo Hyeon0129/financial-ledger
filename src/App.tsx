@@ -2074,6 +2074,8 @@ const AccountsView: React.FC<{
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showLoanForm, setShowLoanForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [showSettleForm, setShowSettleForm] = useState(false);
+  const [settlingLoan, setSettlingLoan] = useState<Loan | null>(null);
 
   const cardThemes = [
     'card-theme-emerald',
@@ -2096,17 +2098,6 @@ const AccountsView: React.FC<{
     await onRefreshLoans();
   };
 
-  const handleSettleLoan = async (loan: Loan) => {
-    const defaultDate = new Date().toISOString().slice(0, 10);
-    const date = window.prompt('상환일을 입력하세요 (YYYY-MM-DD)', defaultDate);
-    if (!date) return;
-    try {
-      await loansApi.settle(loan.id, date);
-      await onRefreshLoans();
-    } catch {
-      alert('상환 처리에 실패했습니다.');
-    }
-  };
 
   return (
     <>
@@ -2229,7 +2220,7 @@ const AccountsView: React.FC<{
                 <div className="tx-col-date">{loan.next_due_date ? formatDate(loan.next_due_date) : '완납'}</div>
                 <div className="tx-col-actions">
                   <button className="btn btn-sm" onClick={() => { setEditingLoan(loan); setShowLoanForm(true); }}>수정</button>
-                  <button className="btn btn-sm" onClick={() => handleSettleLoan(loan)}>상환</button>
+                  <button className="btn btn-sm" onClick={() => { setSettlingLoan(loan); setShowSettleForm(true); }}>상환</button>
                   <button className="btn btn-sm btn-danger" onClick={() => handleDeleteLoan(loan.id)}>삭제</button>
                 </div>
               </div>
@@ -2270,6 +2261,19 @@ const AccountsView: React.FC<{
             setShowLoanForm(false);
             setEditingLoan(null);
             await onRefreshLoans();
+          }}
+        />
+      )}
+      {showSettleForm && settlingLoan && (
+        <LoanSettleModal
+          loan={settlingLoan}
+          accounts={accounts}
+          onClose={() => { setShowSettleForm(false); setSettlingLoan(null); }}
+          onSettled={async () => {
+            setShowSettleForm(false);
+            setSettlingLoan(null);
+            await onRefreshLoans();
+            await onRefresh();
           }}
         />
       )}
@@ -2589,6 +2593,108 @@ const LoanFormModal: React.FC<{
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ========== Loan Settle Modal ==========
+const LoanSettleModal: React.FC<{
+  loan: Loan;
+  accounts: Account[];
+  onClose: () => void;
+  onSettled: () => void;
+}> = ({ loan, accounts, onClose, onSettled }) => {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [amount, setAmount] = useState('');
+  const [accountId, setAccountId] = useState(loan.account_id || accounts[0]?.id || '');
+  const [saving, setSaving] = useState(false);
+
+  const remaining = loan.remaining_principal;
+  const parsedAmount = amount.trim().length > 0 ? Number(amount.replace(/,/g, '')) : remaining;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const pay = parsedAmount;
+    if (!pay || pay <= 0) {
+      alert('상환 금액을 입력해주세요.');
+      return;
+    }
+    if (!accountId) {
+      alert('상환 계좌를 선택해주세요.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await loansApi.settle(loan.id, {
+        settled_at: date,
+        amount: pay,
+        account_id: accountId,
+      });
+      onSettled();
+    } catch {
+      alert('상환 처리에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-content" style={{ maxWidth: 420 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div className="panel-title">대출 상환</div>
+            <div className="panel-sub">상환 일자, 금액, 계좌를 선택하세요</div>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+            <Icons.Close />
+          </button>
+        </div>
+
+        <form className="form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">상환 일자</label>
+            <input
+              type="date"
+              className="form-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">상환 금액 (남은 원금: {formatCurrency(remaining, '₩')})</label>
+            <input
+              className="form-input"
+              placeholder={formatCurrency(remaining, '₩')}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">상환 계좌</label>
+            <select
+              className="form-select"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
+              취소
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? '상환 중...' : '상환 완료'}
             </button>
           </div>
         </form>

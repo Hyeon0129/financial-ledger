@@ -268,10 +268,10 @@ export const loansApi = {
 
   delete: (id: string) => fetchAPI<void>(`/loans/${id}`, { method: 'DELETE' }),
 
-  settle: (id: string, settled_at: string) =>
+  settle: (id: string, params: { settled_at: string; amount?: number; account_id?: string }) =>
     fetchAPI<Loan>(`/loans/${id}/settle`, {
       method: 'PUT',
-      body: JSON.stringify({ settled_at }),
+      body: JSON.stringify(params),
     }),
 };
 
