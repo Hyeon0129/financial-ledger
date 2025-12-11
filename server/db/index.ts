@@ -111,14 +111,8 @@ export function initDatabase() {
   console.log('Database initialized successfully!');
 }
 
-// Check if database needs initialization
-const tableExists = db.prepare(`
-  SELECT name FROM sqlite_master WHERE type='table' AND name='users'
-`).get();
-
-if (!tableExists) {
-  initDatabase();
-}
+// 항상 전체 스키마를 한 번 실행해 필요한 테이블을 보장 (IF NOT EXISTS로 안전)
+initDatabase();
 
 export default db;
 

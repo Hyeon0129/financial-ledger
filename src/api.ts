@@ -99,23 +99,6 @@ export interface SavingsGoal {
   created_at: string;
 }
 
-export interface RecurringPayment {
-  id: string;
-  user_id: string;
-  name: string;
-  amount: number;
-  category_id: string | null;
-  account_id: string | null;
-  cycle: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  next_billing_date: string;
-  is_active: boolean;
-  created_at: string;
-  // Joined fields
-  category_name?: string;
-  category_color?: string;
-  account_name?: string;
-}
-
 export interface MonthlyStats {
   month: string;
   income: number;
@@ -307,26 +290,6 @@ export const savingsGoalsApi = {
   
   delete: (id: string) =>
     fetchAPI<void>(`/savings-goals/${id}`, { method: 'DELETE' }),
-};
-
-// ========== Recurring Payments API ==========
-export const recurringPaymentsApi = {
-  list: () => fetchAPI<RecurringPayment[]>('/recurring-payments'),
-  
-  create: (data: Omit<RecurringPayment, 'id' | 'user_id' | 'created_at'>) =>
-    fetchAPI<RecurringPayment>('/recurring-payments', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  update: (id: string, data: Partial<RecurringPayment>) =>
-    fetchAPI<RecurringPayment>(`/recurring-payments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  
-  delete: (id: string) =>
-    fetchAPI<void>(`/recurring-payments/${id}`, { method: 'DELETE' }),
 };
 
 // ========== Statistics API ==========

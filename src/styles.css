@@ -2908,62 +2908,6 @@ body[data-theme="dark"] .progress-track {
   margin-top: var(--space-3);
 }
 
-/* ========== Recurring Payment ========== */
-.recurring-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: all var(--transition-base);
-}
-
-.recurring-card:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-sm);
-}
-
-body[data-theme="dark"] .recurring-card {
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)),
-    rgba(20, 20, 25, 0.5);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-body[data-theme="dark"] .recurring-card:hover {
-  background: rgba(25, 25, 30, 0.6);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.recurring-info h4 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-1);
-}
-
-.recurring-meta {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.recurring-amount {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--danger);
-  font-feature-settings: 'tnum';
-}
-
 /* ========== Category List ========== */
 .category-list {
   display: flex;

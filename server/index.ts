@@ -24,6 +24,17 @@ app.use(express.json());
 // Demo user ID (in production, use auth middleware)
 const DEMO_USER_ID = 'demo-user';
 
+
+// Memo helper: 내부 저장은 loan.id 포함, 응답에서는 숨김
+const scrubLoanMemo = (memo: string | null): string | null => {
+  if (!memo) return memo;
+  return memo.replace(/^\[대출상환:[^\]]+\]\s*/, '[대출상환] ');
+};
+const sanitizeTransaction = (t: any) => ({
+  ...t,
+  memo: scrubLoanMemo(t.memo),
+});
+
 // ===== Loans helpers =====
 const clampDay = (year: number, monthIndex: number, day: number) => {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -115,9 +126,15 @@ const processLoans = () => {
     WHERE user_id = ? AND memo = ? AND date = ? AND account_id = ?
   `);
   // Broad duplicate detector for past 상환 기록 (old/new memo 형태 포함)
+  // 신규 포맷: loan.id를 포함해 동일 계좌/날짜라도 대출별로 확실히 구분
   const existingTxLoanDay = db.prepare(`
     SELECT id, memo FROM transactions 
-    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '[대출상환%'
+    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE ?
+  `);
+  // 레거시 포맷(loan.id 미포함)도 한 번만 업데이트하도록 탐지 (후처리에서 loan.name으로 필터)
+  const existingTxLoanDayLegacy = db.prepare(`
+    SELECT id, memo FROM transactions 
+    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '%대출상환%'
   `);
 
   loans.forEach((loan) => {
@@ -128,7 +145,7 @@ const processLoans = () => {
     let remaining = loan.remaining_principal ?? loan.principal;
     let paidMonths = loan.paid_months ?? 0;
     // nextDue를 start_date 기준 paidMonths만큼 전진해 재계산
-    let nextDue = getFirstDueDate(loan.start_date, dueDay);
+    let nextDue: string | null = getFirstDueDate(loan.start_date, dueDay);
     for (let i = 0; i < paidMonths && nextDue; i++) {
       nextDue = addMonthsKeepDay(nextDue, dueDay);
     }
@@ -160,15 +177,21 @@ const processLoans = () => {
       }
 
       if (payment > 0) {
-        // 사용자 지정 대출명을 메모에 노출하되, 날짜/계좌 기반 중복 검증은 유지
-        const memo = `[대출상환] ${loan.name}:${paidMonths + 1}/${loan.term_months}`;
+        // 메모에 loan.id를 포함해 동일 계좌/날짜라도 대출별로 확실히 구분
+        const memo = `[대출상환:${loan.id}] ${loan.name}:${paidMonths + 1}/${loan.term_months}`;
         const dupExact = existingTx.get(DEMO_USER_ID, memo, nextDue, loan.account_id);
-        const dupLoose = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id) as { id: string; memo: string } | undefined;
+        const dupSameLoan = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id, `[대출상환:${loan.id}]%`) as { id: string; memo: string } | undefined;
+        // 레거시: 같은 계좌/날짜라도 메모가 이 대출 이름으로 시작하는 경우만 승격 (다른 대출은 건드리지 않음)
+        const legacyCandidates = existingTxLoanDayLegacy.all(DEMO_USER_ID, nextDue, loan.account_id) as Array<{ id: string; memo: string }>;
+        const dupLegacy = legacyCandidates.find((row) => row.memo?.startsWith(`[대출상환] ${loan.name}:`));
         if (dupExact) {
           // 동일 메모가 이미 존재하면 새로 만들지 않음
-        } else if (dupLoose?.id) {
-          // 이전 버전으로 생성된 메모(ID 기반 등)를 최신 포맷으로 교체
-          db.prepare(`UPDATE transactions SET memo = ? WHERE id = ?`).run(memo, dupLoose.id);
+        } else if (dupSameLoan?.id) {
+          // 같은 대출(신규 포맷)인데 메모만 다르면 최신 포맷으로 교체
+          db.prepare(`UPDATE transactions SET memo = ? WHERE id = ?`).run(memo, dupSameLoan.id);
+        } else if (dupLegacy?.id) {
+          // 같은 이름의 레거시 포맷만 새 포맷으로 승격 (다른 대출은 그대로 둠)
+          db.prepare(`UPDATE transactions SET memo = ? WHERE id = ?`).run(memo, dupLegacy.id);
         } else {
           insertTx.run(uuidv4(), DEMO_USER_ID, payment, loan.category_id || null, loan.account_id, nextDue, memo);
           adjustAccountBalance(loan.account_id, -payment);
@@ -178,13 +201,13 @@ const processLoans = () => {
           remaining = Math.max(0, remaining - principalPortion);
         }
         paidMonths += 1;
-        nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue, dueDay);
+        nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue!, dueDay);
         continue;
       }
 
       // payment가 0이면 스케줄만 진행
       paidMonths += 1;
-      nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue, dueDay);
+      nextDue = paidMonths >= loan.term_months ? null : addMonthsKeepDay(nextDue!, dueDay);
     }
 
     const finalRemaining = Math.max(0, remaining);
@@ -222,7 +245,7 @@ app.get('/api/transactions', (req, res) => {
   
   query += ` ORDER BY t.date DESC, t.created_at DESC`;
   
-  const transactions = db.prepare(query).all(...params);
+  const transactions = db.prepare(query).all(...params).map(sanitizeTransaction);
   res.json(transactions);
 });
 
@@ -238,13 +261,13 @@ app.post('/api/transactions', (req, res) => {
   if (type === 'income') adjustAccountBalance(account_id, amount);
   else if (type === 'expense') adjustAccountBalance(account_id, -amount);
   
-  const transaction = db.prepare(`
+  const transaction = sanitizeTransaction(db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.id = ?
-  `).get(id);
+  `).get(id));
   
   res.status(201).json(transaction);
 });
@@ -270,13 +293,13 @@ app.put('/api/transactions/:id', (req, res) => {
   if (type === 'income') adjustAccountBalance(account_id, amount);
   else if (type === 'expense') adjustAccountBalance(account_id, -amount);
   
-  const transaction = db.prepare(`
+  const transaction = sanitizeTransaction(db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.id = ?
-  `).get(id);
+  `).get(id));
   
   res.json(transaction);
 });
@@ -655,67 +678,6 @@ app.delete('/api/savings-goals/:id', (req, res) => {
   res.status(204).send();
 });
 
-// ========== RECURRING PAYMENTS ==========
-
-app.get('/api/recurring-payments', (req, res) => {
-  const payments = db.prepare(`
-    SELECT r.*, c.name as category_name, c.color as category_color, a.name as account_name
-    FROM recurring_payments r
-    LEFT JOIN categories c ON r.category_id = c.id
-    LEFT JOIN accounts a ON r.account_id = a.id
-    WHERE r.user_id = ?
-    ORDER BY r.next_billing_date
-  `).all(DEMO_USER_ID);
-  res.json(payments);
-});
-
-app.post('/api/recurring-payments', (req, res) => {
-  const { name, amount, category_id, account_id, cycle, next_billing_date, is_active } = req.body;
-  const id = uuidv4();
-  
-  db.prepare(`
-    INSERT INTO recurring_payments (id, user_id, name, amount, category_id, account_id, cycle, next_billing_date, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, DEMO_USER_ID, name, amount, category_id, account_id, cycle, next_billing_date, is_active !== false ? 1 : 0);
-  
-  const payment = db.prepare(`
-    SELECT r.*, c.name as category_name, c.color as category_color, a.name as account_name
-    FROM recurring_payments r
-    LEFT JOIN categories c ON r.category_id = c.id
-    LEFT JOIN accounts a ON r.account_id = a.id
-    WHERE r.id = ?
-  `).get(id);
-  
-  res.status(201).json(payment);
-});
-
-app.put('/api/recurring-payments/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, amount, category_id, account_id, cycle, next_billing_date, is_active } = req.body;
-  
-  db.prepare(`
-    UPDATE recurring_payments 
-    SET name = ?, amount = ?, category_id = ?, account_id = ?, cycle = ?, next_billing_date = ?, is_active = ?
-    WHERE id = ? AND user_id = ?
-  `).run(name, amount, category_id, account_id, cycle, next_billing_date, is_active ? 1 : 0, id, DEMO_USER_ID);
-  
-  const payment = db.prepare(`
-    SELECT r.*, c.name as category_name, c.color as category_color, a.name as account_name
-    FROM recurring_payments r
-    LEFT JOIN categories c ON r.category_id = c.id
-    LEFT JOIN accounts a ON r.account_id = a.id
-    WHERE r.id = ?
-  `).get(id);
-  
-  res.json(payment);
-});
-
-app.delete('/api/recurring-payments/:id', (req, res) => {
-  const { id } = req.params;
-  db.prepare('DELETE FROM recurring_payments WHERE id = ? AND user_id = ?').run(id, DEMO_USER_ID);
-  res.status(204).send();
-});
-
 // ========== STATISTICS ==========
 
 app.get('/api/stats/monthly', (req, res) => {
@@ -762,6 +724,7 @@ app.get('/api/stats/monthly', (req, res) => {
   `).all(DEMO_USER_ID, targetMonth);
   
   // Budget usage
+  // 영구 예산(permanent)을 월별 집계에 매핑: 선택 월 거래만 합산
   const budgetUsage = db.prepare(`
     SELECT 
       b.id,
@@ -769,16 +732,15 @@ app.get('/api/stats/monthly', (req, res) => {
       c.name as category_name,
       c.color as category_color,
       b.amount as budget_amount,
-      COALESCE(SUM(t.amount), 0) as spent
+      COALESCE(SUM(CASE WHEN strftime('%Y-%m', t.date) = ? THEN t.amount ELSE 0 END), 0) as spent
     FROM budgets b
     LEFT JOIN categories c ON b.category_id = c.id
     LEFT JOIN transactions t ON t.category_id = b.category_id 
       AND t.user_id = b.user_id 
-      AND strftime('%Y-%m', t.date) = b.month
       AND t.type = 'expense'
-    WHERE b.user_id = ? AND b.month = ?
+    WHERE b.user_id = ? AND b.month = 'permanent'
     GROUP BY b.id
-  `).all(DEMO_USER_ID, targetMonth);
+  `).all(targetMonth, DEMO_USER_ID);
   
   const income = summary.find(s => s.type === 'income')?.total || 0;
   const expense = summary.find(s => s.type === 'expense')?.total || 0;

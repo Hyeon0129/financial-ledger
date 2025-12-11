@@ -6,12 +6,12 @@ import {
   ComposedChart, Area, Line
 } from 'recharts';
 import type {
-  Transaction, Category, Account, Budget, SavingsGoal, RecurringPayment, Loan,
+  Transaction, Category, Account, Budget, SavingsGoal, Loan,
   MonthlyStats
 } from './api';
 import {
   transactionsApi, categoriesApi, accountsApi, budgetsApi,
-  savingsGoalsApi, recurringPaymentsApi, statsApi, userApi, loansApi,
+  savingsGoalsApi, statsApi, userApi, loansApi,
   formatCurrency, getMonthKey, formatDate
 } from './api';
 import './styles.css';
@@ -20,7 +20,7 @@ import './styles.css';
 
 
 // ========== Types ==========
-type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'recurring' | 'profile';
+type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'profile';
 
 // ========== View Meta (Localized Titles) ==========
 const viewMeta: Record<View, { title: string; subtitle?: string }> = {
@@ -31,7 +31,6 @@ const viewMeta: Record<View, { title: string; subtitle?: string }> = {
   accounts: { title: '계좌 관리', subtitle: '저축통장, 신용카드, 체크카드 등을 관리합니다' },
   reports: { title: '리포트', subtitle: '월간/연간 리포트를 확인하세요' },
   savings: { title: '저축 목표', subtitle: '목표 달성 상황을 추적합니다' },
-  recurring: { title: '정기 결제', subtitle: '구독·정기 결제를 관리합니다' },
   profile: { title: '프로필', subtitle: '계정 정보를 관리합니다' },
 };
 
@@ -73,7 +72,6 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
-  const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const monthlyAccountSpend = useMemo(() => {
     const map: Record<string, number> = {};
@@ -116,19 +114,17 @@ const App: React.FC = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [user, cats, accs, goals, recurring, loanList] = await Promise.all([
+        const [user, cats, accs, goals, loanList] = await Promise.all([
           userApi.get(),
           categoriesApi.list(),
           accountsApi.list(),
           savingsGoalsApi.list(),
-          recurringPaymentsApi.list(),
           loansApi.list(),
         ]);
         setCurrency(user.currency);
         setCategories(cats);
         setAccounts(accs);
         setSavingsGoals(goals);
-        setRecurringPayments(recurring);
         setLoans(loanList);
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -215,11 +211,6 @@ const App: React.FC = () => {
   const refreshGoals = useCallback(async () => {
     const goals = await savingsGoalsApi.list();
     setSavingsGoals(goals);
-  }, []);
-
-  const refreshRecurring = useCallback(async () => {
-    const recurring = await recurringPaymentsApi.list();
-    setRecurringPayments(recurring);
   }, []);
 
   if (loading) {
@@ -313,7 +304,6 @@ const App: React.FC = () => {
               transactions={transactions}
               budgets={budgets}
               savingsGoals={savingsGoals}
-              recurringPayments={recurringPayments}
               categories={categories}
               accounts={accounts}
               currency={currency}
@@ -374,15 +364,6 @@ const App: React.FC = () => {
               onRefresh={refreshGoals}
             />
           )}
-          {view === 'recurring' && (
-            <RecurringView
-              payments={recurringPayments}
-              categories={categories}
-              accounts={accounts}
-              currency={currency}
-              onRefresh={refreshRecurring}
-            />
-          )}
         </section>
       </main>
       </div>
@@ -396,7 +377,6 @@ const DashboardView: React.FC<{
   transactions: Transaction[];
   budgets: Budget[];
   savingsGoals: SavingsGoal[];
-  recurringPayments: RecurringPayment[];
   categories: Category[];
   accounts: Account[];
   currency: string;
@@ -3212,277 +3192,4 @@ const SavingsFormModal: React.FC<{
   );
 };
 
-// ========== Recurring View ==========
-const RecurringView: React.FC<{
-  payments: RecurringPayment[];
-  categories: Category[];
-  accounts: Account[];
-  currency: string;
-  onRefresh: () => void;
-}> = ({ payments, categories, accounts, currency, onRefresh }) => {
-  const [showForm, setShowForm] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<RecurringPayment | null>(null);
-
-  const handleEdit = (payment: RecurringPayment) => {
-    setEditingPayment(payment);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('이 정기 결제를 삭제할까요?')) return;
-    await recurringPaymentsApi.delete(id);
-    onRefresh();
-  };
-
-  const cycleLabels: Record<string, string> = {
-    daily: '매일',
-    weekly: '매주',
-    monthly: '매월',
-    yearly: '매년',
-  };
-
-  const totalMonthly = payments
-    .filter(p => p.is_active && p.cycle === 'monthly')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div>
-          <div className="panel-title">정기 결제</div>
-          <div className="panel-sub">월 예상 결제액: {formatCurrency(totalMonthly, currency)}</div>
-            </div>
-        <button className="btn btn-primary" onClick={() => { setEditingPayment(null); setShowForm(true); }}>
-          <Icons.Plus /> 새 정기결제
-        </button>
-          </div>
-
-      {payments.length > 0 ? (
-        <div className="card-grid card-grid-3">
-          {payments.map((payment) => (
-            <div key={payment.id} className="card">
-              <div className="card-header">
-                <span className="card-title">{cycleLabels[payment.cycle]}</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-sm" onClick={() => handleEdit(payment)}>
-                    수정
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(payment.id)}>
-                    삭제
-                  </button>
-                </div>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                {payment.name}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                {payment.category_name} · {payment.account_name || '-'}
-              </div>
-              <div style={{ 
-                fontSize: 24, 
-                fontWeight: 700, 
-                color: '#EF4444',
-                marginBottom: 8,
-                fontFeatureSettings: '"tnum"'
-              }}>
-                {formatCurrency(payment.amount, currency)}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                시작일: {formatDate(payment.next_billing_date)}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state" style={{ background: 'var(--glass-bg)', borderRadius: 20, padding: 60 }}>
-          <div className="empty-state-icon">🔄</div>
-          <div className="empty-state-title">정기 결제가 없습니다</div>
-          <div className="empty-state-text">구독 서비스나 정기 결제를 추가해보세요</div>
-          <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => { setEditingPayment(null); setShowForm(true); }}>
-            <Icons.Plus /> 새 정기결제 추가
-          </button>
-        </div>
-      )}
-
-      {showForm && (
-        <RecurringFormModal
-          categories={categories}
-          accounts={accounts}
-          editingPayment={editingPayment}
-          onClose={() => { setShowForm(false); setEditingPayment(null); }}
-          onSave={() => {
-            setShowForm(false);
-            setEditingPayment(null);
-            onRefresh();
-          }}
-        />
-      )}
-    </>
-  );
-};
-
-// ========== Recurring Form Modal ==========
-const RecurringFormModal: React.FC<{
-  categories: Category[];
-  accounts: Account[];
-  editingPayment?: RecurringPayment | null;
-  onClose: () => void;
-  onSave: () => void;
-}> = ({ categories, accounts, editingPayment, onClose, onSave }) => {
-  const [name, setName] = useState(editingPayment?.name || '');
-  const [amount, setAmount] = useState(editingPayment ? String(editingPayment.amount) : '');
-  const [categoryId, setCategoryId] = useState(editingPayment?.category_id || categories.find(c => c.type === 'expense')?.id || '');
-  const [accountId, setAccountId] = useState(editingPayment?.account_id || accounts[0]?.id || '');
-  const [cycle, setCycle] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(editingPayment?.cycle || 'monthly');
-  const [nextBillingDate, setNextBillingDate] = useState(editingPayment?.next_billing_date || '');
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      alert('이름을 입력해주세요.');
-      return;
-    }
-    const amountValue = Number(amount.replace(/,/g, ''));
-    if (!amountValue || amountValue <= 0) {
-      alert('금액을 입력해주세요.');
-      return;
-    }
-    if (!nextBillingDate) {
-      alert('시작 결제일을 선택해주세요.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      if (editingPayment) {
-        await recurringPaymentsApi.update(editingPayment.id, {
-          name: name.trim(),
-          amount: amountValue,
-          category_id: categoryId,
-          account_id: accountId,
-          cycle,
-          next_billing_date: nextBillingDate,
-          is_active: true,
-        });
-      } else {
-        await recurringPaymentsApi.create({
-          name: name.trim(),
-          amount: amountValue,
-          category_id: categoryId,
-          account_id: accountId,
-          cycle,
-          next_billing_date: nextBillingDate,
-          is_active: true,
-        });
-      }
-      onSave();
-    } catch {
-      alert('저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div>
-            <div className="panel-title">{editingPayment ? '정기 결제 수정' : '새 정기 결제'}</div>
-            <div className="panel-sub">결제 정보를 입력해주세요</div>
-            </div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
-            <Icons.Close />
-          </button>
-          </div>
-
-        <form className="form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">이름</label>
-            <input
-              className="form-input"
-              placeholder="예: 넷플릭스, 헬스장"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-        </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">금액</label>
-              <input
-                className="form-input"
-                placeholder="예: 17,000"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-      </div>
-            <div className="form-group">
-              <label className="form-label">결제 주기</label>
-              <select
-                className="form-select"
-                value={cycle}
-                onChange={(e) => setCycle(e.target.value as typeof cycle)}
-              >
-                <option value="monthly">매월</option>
-                <option value="weekly">매주</option>
-                <option value="yearly">매년</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">카테고리</label>
-              <select
-                className="form-select"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-              >
-                {categories.filter(c => c.type === 'expense').map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">결제 계좌</label>
-              <select
-                className="form-select"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">시작 결제일</label>
-            <input
-              type="date"
-              className="form-input"
-              value={nextBillingDate}
-              onChange={(e) => setNextBillingDate(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
-              취소
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '저장 중...' : '저장'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
 export default App;
-
-
