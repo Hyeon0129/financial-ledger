@@ -34,6 +34,30 @@ export interface Account {
   created_at: string;
 }
 
+export interface Loan {
+  id: string;
+  user_id: string;
+  name: string;
+  principal: number;
+  interest_rate: number;
+  term_months: number;
+  start_date: string;
+  monthly_due_day: number;
+  account_id: string;
+  category_id: string | null;
+  remaining_principal: number;
+  monthly_payment: number;
+  paid_months: number;
+  next_due_date: string | null;
+  created_at: string;
+  repayment_type: 'amortized' | 'interest_only' | 'principal_equal';
+  settled_at?: string | null;
+  // joined
+  account_name?: string;
+  category_name?: string;
+  category_color?: string;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
@@ -214,6 +238,41 @@ export const accountsApi = {
   
   delete: (id: string) =>
     fetchAPI<void>(`/accounts/${id}`, { method: 'DELETE' }),
+};
+
+// ========== Loans API ==========
+export const loansApi = {
+  list: () => fetchAPI<Loan[]>('/loans'),
+
+  create: (data: {
+    name: string;
+    principal: number;
+    interest_rate: number;
+    term_months: number;
+    start_date: string;
+    monthly_due_day: number;
+    account_id: string;
+    category_id?: string | null;
+    repayment_type?: 'amortized' | 'interest_only' | 'principal_equal';
+  }) =>
+    fetchAPI<Loan>('/loans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<Loan>) =>
+    fetchAPI<Loan>(`/loans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) => fetchAPI<void>(`/loans/${id}`, { method: 'DELETE' }),
+
+  settle: (id: string, settled_at: string) =>
+    fetchAPI<Loan>(`/loans/${id}/settle`, {
+      method: 'PUT',
+      body: JSON.stringify({ settled_at }),
+    }),
 };
 
 // ========== Budgets API ==========

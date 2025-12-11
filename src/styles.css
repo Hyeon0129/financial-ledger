@@ -2083,13 +2083,47 @@ body[data-theme="dark"] .card.balance-card {
 
 .manage-row .tx-col-amount {
   justify-content: flex-end;
-  text-align: right;
+  text-align: center;
 }
 
 .manage-row .tx-col-actions {
   display: flex;
   justify-content: center;
   gap: 8px;
+}
+
+/* Loan tooltip */
+.loan-row-with-tooltip {
+  position: relative;
+}
+
+.loan-row-with-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 16px;
+  top: -12px;
+  padding: 8px 12px;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 5;
+  white-space: nowrap;
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+.loan-row-with-tooltip:hover::after {
+  opacity: 1;
+  transform: translateY(-10px);
 }
 
 .budgets-table .tx-row {
@@ -2362,6 +2396,33 @@ body[data-theme="dark"] .panel-side {
 .panel-actions {
   display: flex;
   gap: var(--space-3);
+}
+
+/* Panel block (single column) */
+.panel-block {
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: none;
+  padding: 28px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+body[data-theme="dark"] .panel-block {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.08)),
+    rgba(16, 18, 24, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.loans-panel {
+  margin-top: 28px;
 }
 
 /* ========== Buttons ========== */

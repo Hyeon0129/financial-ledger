@@ -101,6 +101,33 @@ CREATE TABLE IF NOT EXISTS recurring_payments (
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL
 );
 
+-- Loans table (대출 관리)
+CREATE TABLE IF NOT EXISTS loans (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  principal REAL NOT NULL,
+  interest_rate REAL NOT NULL, -- 연이율 (%)
+  term_months INTEGER NOT NULL,
+  start_date TEXT NOT NULL,
+  monthly_due_day INTEGER NOT NULL,
+  account_id TEXT NOT NULL,
+  category_id TEXT,
+  remaining_principal REAL NOT NULL,
+  monthly_payment REAL NOT NULL,
+  paid_months INTEGER DEFAULT 0,
+  next_due_date TEXT,
+  repayment_type TEXT CHECK(repayment_type IN ('amortized', 'interest_only', 'principal_equal')) DEFAULT 'amortized',
+  settled_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_loans_user_id ON loans(user_id);
+CREATE INDEX IF NOT EXISTS idx_loans_next_due ON loans(next_due_date);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
