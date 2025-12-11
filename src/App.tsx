@@ -172,14 +172,18 @@ const App: React.FC = () => {
 
   // Refresh functions
   const refreshTransactions = useCallback(async () => {
-    const txs = await transactionsApi.list({ month });
+    const [txs, monthStats, prevMonthStats, yrStats, accs] = await Promise.all([
+      transactionsApi.list({ month }),
+      statsApi.monthly(month),
+      statsApi.monthly(prevMonthKey),
+      statsApi.yearly(Number(month.split('-')[0])),
+      accountsApi.list(),
+    ]);
     setTransactions(normalizeTransactions(txs));
-    const monthStats = await statsApi.monthly(month);
-    const prevMonthStats = await statsApi.monthly(prevMonthKey);
-    const yrStats = await statsApi.yearly(Number(month.split('-')[0]));
     setStats(monthStats);
     setPrevStats(prevMonthStats);
     setYearlyStats(yrStats);
+    setAccounts(accs);
   }, [month, normalizeTransactions, prevMonthKey]);
 
   const refreshBudgets = useCallback(async () => {

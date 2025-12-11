@@ -30,6 +30,11 @@ const formatYMD = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+const adjustAccountBalance = (accountId: string | null | undefined, delta: number) => {
+  if (!accountId) return;
+  db.prepare(`UPDATE accounts SET balance = balance + ? WHERE id = ? AND user_id = ?`).run(delta, accountId, DEMO_USER_ID);
+};
+
 const addMonthsKeepDay = (dateStr: string, targetDay: number) => {
   const d = toDate(dateStr);
   d.setMonth(d.getMonth() + 1, 1);
@@ -196,6 +201,9 @@ app.post('/api/transactions', (req, res) => {
     INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, DEMO_USER_ID, type, amount, category_id, account_id, date, memo);
+
+  if (type === 'income') adjustAccountBalance(account_id, amount);
+  else if (type === 'expense') adjustAccountBalance(account_id, -amount);
   
   const transaction = db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -211,12 +219,23 @@ app.post('/api/transactions', (req, res) => {
 app.put('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
   const { type, amount, category_id, account_id, date, memo } = req.body;
+
+  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as Transaction | undefined;
+  if (!existing) return res.status(404).send();
+
+  // revert old balance
+  if (existing.type === 'income') adjustAccountBalance(existing.account_id, -existing.amount);
+  else if (existing.type === 'expense') adjustAccountBalance(existing.account_id, existing.amount);
   
   db.prepare(`
     UPDATE transactions 
     SET type = ?, amount = ?, category_id = ?, account_id = ?, date = ?, memo = ?
     WHERE id = ? AND user_id = ?
   `).run(type, amount, category_id, account_id, date, memo, id, DEMO_USER_ID);
+
+  // apply new balance
+  if (type === 'income') adjustAccountBalance(account_id, amount);
+  else if (type === 'expense') adjustAccountBalance(account_id, -amount);
   
   const transaction = db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -231,6 +250,11 @@ app.put('/api/transactions/:id', (req, res) => {
 
 app.delete('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
+  const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as Transaction | undefined;
+  if (existing) {
+    if (existing.type === 'income') adjustAccountBalance(existing.account_id, -existing.amount);
+    else if (existing.type === 'expense') adjustAccountBalance(existing.account_id, existing.amount);
+  }
   db.prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?').run(id, DEMO_USER_ID);
   res.status(204).send();
 });
