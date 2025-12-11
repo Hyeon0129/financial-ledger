@@ -25,11 +25,13 @@ app.use(express.json());
 const DEMO_USER_ID = 'demo-user';
 
 
-// Memo helper: 내부 저장은 loan.id 포함, 응답에서는 숨김
+
 const scrubLoanMemo = (memo: string | null): string | null => {
   if (!memo) return memo;
   return memo.replace(/^\[대출상환:[^\]]+\]\s*/, '[대출상환] ');
 };
+// any 타입은 유지하되 lint 무시
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sanitizeTransaction = (t: any) => ({
   ...t,
   memo: scrubLoanMemo(t.memo),
