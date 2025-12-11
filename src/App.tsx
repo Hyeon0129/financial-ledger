@@ -22,6 +22,19 @@ import './styles.css';
 // ========== Types ==========
 type View = 'dashboard' | 'transactions' | 'budgets' | 'categories' | 'accounts' | 'reports' | 'savings' | 'recurring' | 'profile';
 
+// ========== View Meta (Localized Titles) ==========
+const viewMeta: Record<View, { title: string; subtitle?: string }> = {
+  dashboard: { title: '대시보드', subtitle: '자산과 지출을 한눈에 확인하세요' },
+  transactions: { title: '거래 내역', subtitle: '월별 거래를 캘린더로 확인합니다' },
+  budgets: { title: '예산 관리', subtitle: '카테고리별 예산을 설정하고 추적합니다' },
+  categories: { title: '카테고리', subtitle: '수입/지출 카테고리를 관리합니다' },
+  accounts: { title: '계좌 관리', subtitle: '저축통장, 신용카드, 체크카드 등을 관리합니다' },
+  reports: { title: '리포트', subtitle: '월간/연간 리포트를 확인하세요' },
+  savings: { title: '저축 목표', subtitle: '목표 달성 상황을 추적합니다' },
+  recurring: { title: '정기 결제', subtitle: '구독·정기 결제를 관리합니다' },
+  profile: { title: '프로필', subtitle: '계정 정보를 관리합니다' },
+};
+
 // ========== Design Tokens (Charts & Icons) ==========
 // (unused palette removed)
 
@@ -216,43 +229,43 @@ const App: React.FC = () => {
             className={view === 'dashboard' ? 'active' : ''} 
             onClick={() => setView('dashboard')}
           >
-            Dashboard
+            대시보드
           </button>
           <button 
             className={view === 'transactions' ? 'active' : ''} 
             onClick={() => setView('transactions')}
           >
-            Transactions
+            거래 내역
           </button>
           <button 
             className={view === 'budgets' ? 'active' : ''} 
             onClick={() => setView('budgets')}
           >
-            Budgets
+            예산 관리
           </button>
           <button 
             className={view === 'reports' ? 'active' : ''} 
             onClick={() => setView('reports')}
           >
-            Reports
+            리포트
           </button>
           <button 
             className={view === 'categories' ? 'active' : ''} 
             onClick={() => setView('categories')}
           >
-            Categories
+            카테고리
           </button>
           <button 
             className={view === 'accounts' ? 'active' : ''} 
             onClick={() => setView('accounts')}
           >
-            Accounts
+            계좌 관리
           </button>
           <button 
             className={view === 'savings' ? 'active' : ''} 
             onClick={() => setView('savings')}
           >
-            My Goals
+            저축 목표
           </button>
         </nav>
         <div className="header-right">
@@ -274,7 +287,12 @@ const App: React.FC = () => {
       <main className="app-main">
         <section className="content">
           <div className="content-header">
-            <h1 className="page-title">{view.charAt(0).toUpperCase() + view.slice(1)}</h1>
+            <div className="page-heading" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <h1 className="page-title">{viewMeta[view].title}</h1>
+              {viewMeta[view].subtitle && (
+                <div className="page-subtitle">{viewMeta[view].subtitle}</div>
+              )}
+            </div>
         </div>
           {view === 'dashboard' && (
             <DashboardView 
@@ -412,7 +430,7 @@ const DashboardView: React.FC<{
     if (!change) return { pctText: '전월 데이터 없음', amountText: '', diff: null, pct: null };
     const sign = change.diff >= 0 ? '+' : '-';
     const pctText =
-      change.pct === null ? '신규' : `${sign}${Math.abs(change.pct).toFixed(0)}%`;
+      change.pct === null ? 'New' : `${sign}${Math.abs(change.pct).toFixed(0)}%`;
     const amountText =
       type === 'count'
         ? `${sign}${Math.abs(change.diff)}건`
@@ -556,8 +574,8 @@ const DashboardView: React.FC<{
 
         <div className="card earnings-chart-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Expense Report</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-tertiary)' }}>1 Year</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>소비 리포트</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-tertiary)' }}>1 Month</span>
             </div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -620,7 +638,7 @@ const DashboardView: React.FC<{
             });
           }}
         >
-            <div className="metric-title">Total Earnings</div>
+            <div className="metric-title">총 수입</div>
             <div className="metric-value">{formatCurrency(totalIncome, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.income)}`}>
               <span className="metric-change-main">{incomeChange.pctText}</span>
@@ -635,12 +653,12 @@ const DashboardView: React.FC<{
               title: 'Total Spending',
               current: stats.expense,
               previous: prevStats.expense,
-              change: expenseChange,
+              change: expenseChange, 
               type: 'money',
             });
           }}
         >
-            <div className="metric-title">Total Spending</div>
+            <div className="metric-title">총 지출</div>
             <div className="metric-value">{formatCurrency(totalExpense, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.expense, true)}`}>
               <span className="metric-change-main">{expenseChange.pctText}</span>
@@ -660,7 +678,7 @@ const DashboardView: React.FC<{
             });
           }}
         >
-            <div className="metric-title">Net Balance</div>
+            <div className="metric-title">순잔액</div>
             <div className="metric-value">{formatCurrency(netRevenue, currency)}</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.balance)}`}>
               <span className="metric-change-main">{balanceChange.pctText}</span>
@@ -680,7 +698,7 @@ const DashboardView: React.FC<{
             });
           }}
         >
-            <div className="metric-title">Transactions</div>
+            <div className="metric-title">거래 건수</div>
             <div className="metric-value">{stats.transactionCount.toLocaleString()} 건</div>
             <div className={`metric-change metric-change-row ${changeClass(metricChanges.txCount)}`}>
               <span className="metric-change-main">{txChange.pctText}</span>
@@ -688,7 +706,7 @@ const DashboardView: React.FC<{
           </div>
           <div className="card monthly-limit-card">
             <div className="wallet-header">
-              <div className="metric-title">Monthly Spending Limit</div>
+              <div className="metric-title">월 지출 한도</div>
               <div className="wallet-amount">{formatCurrency(totalBudget, currency)}</div>
             </div>
             <div className="wallet-bar">
@@ -700,8 +718,8 @@ const DashboardView: React.FC<{
               />
             </div>
             <div className="wallet-sub">
-              <span>Used {formatCurrency(stats.expense, currency)}</span>
-              <span>Remaining {formatCurrency(Math.max(0, totalBudget - stats.expense), currency)}</span>
+              <span>사용액 {formatCurrency(stats.expense, currency)}</span>
+              <span>남은 한도 {formatCurrency(Math.max(0, totalBudget - stats.expense), currency)}</span>
             </div>
           </div>
         </div>
@@ -910,6 +928,56 @@ const DashboardView: React.FC<{
           </div>
         </div>
           </div>
+
+      {/* Metric detail modal */}
+      {selectedMetric && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedMetric(null)}>
+          <div className="modal-content" style={{ maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div className="panel-title">{selectedMetric.title}</div>
+                <div className="panel-sub">{prevMonthLabel} → {month}</div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setSelectedMetric(null)}>
+                <Icons.Close />
+              </button>
+            </div>
+
+            <div className="transactions-table-lite manage-table" style={{ padding: 12, marginBottom: 12 }}>
+              <div className="tx-row manage-head" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>구분</div>
+                <div className="tx-col-amount" style={{ justifyContent: 'flex-end' }}>값</div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{prevMonthLabel}</div>
+                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
+                  {selectedMetric.type === 'count'
+                    ? `${selectedMetric.previous.toLocaleString()} 건`
+                    : formatCurrency(selectedMetric.previous, currency)}
+                </div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{month}</div>
+                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
+                  {selectedMetric.type === 'count'
+                    ? `${selectedMetric.current.toLocaleString()} 건`
+                    : formatCurrency(selectedMetric.current, currency)}
+                </div>
+              </div>
+              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="tx-col-label" style={{ justifyContent: 'flex-start', fontWeight: 700 }}>증감</div><br/>
+                <div className={`tx-amount tx-col-amount ${changeClass({ diff: selectedMetric.change.diff ?? 0 })}`} style={{ justifyContent: 'flex-end', fontWeight: 700 }}>
+                  {selectedMetric.change.pctText}  {selectedMetric.change.amountText || formatCurrency(selectedMetric.change.diff ?? 0, currency)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-primary" onClick={() => setSelectedMetric(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -997,24 +1065,24 @@ const TransactionsView: React.FC<{
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
-          <div className="panel-title">Transactions</div>
-          <div className="panel-sub">{month} · {transactions.length} entries</div>
+          
+          <div className="panel-sub">{transactions.length}건</div>
             </div>
         <button className="btn btn-primary" onClick={() => { setEditingTransaction(null); setShowForm(true); }}>
-          <Icons.Plus /> New Transaction
+          <Icons.Plus /> 새 거래
         </button>
         </div>
 
       <div className="panel" style={{ gridTemplateColumns: '2fr 1fr' }}>
         <div className="panel-main">
           <div className="calendar">
-            <div className="calendar-header">Sun</div>
-            <div className="calendar-header">Mon</div>
-            <div className="calendar-header">Tue</div>
-            <div className="calendar-header">Wed</div>
-            <div className="calendar-header">Thu</div>
-            <div className="calendar-header">Fri</div>
-            <div className="calendar-header">Sat</div>
+            <div className="calendar-header">일</div>
+            <div className="calendar-header">월</div>
+            <div className="calendar-header">화</div>
+            <div className="calendar-header">수</div>
+            <div className="calendar-header">목</div>
+            <div className="calendar-header">금</div>
+            <div className="calendar-header">토</div>
             
             {calendarDays.map((day, idx) => {
               const dayTransactions = transactionsByDate[day.date] || [];
@@ -1060,10 +1128,10 @@ const TransactionsView: React.FC<{
           {selectedDayTransactions.length > 0 ? (
             <div className="transactions-table-lite manage-table">
               <div className="tx-row manage-head">
-                <div className="tx-col-type">TYPE</div>
-                <div className="tx-col-label">CATEGORY</div>
-                <div className="tx-col-amount">AMOUNT</div>
-                <div className="tx-col-actions">ACTIONS</div>
+                <div className="tx-col-type">유형</div>
+                <div className="tx-col-label">카테고리</div>
+                <div className="tx-col-amount">금액</div>
+                <div className="tx-col-actions">작업</div>
               </div>
               {selectedDayTransactions.map((t) => (
                 <div key={t.id} className="tx-row manage-row">
@@ -1092,11 +1160,11 @@ const TransactionsView: React.FC<{
             </div>
           ) : selectedDate ? (
             <div className="empty-state">
-              <div className="empty-state-text">No transactions</div>
+              <div className="empty-state-text">거래가 없습니다</div>
       </div>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-text">Select a date to view transactions</div>
+              <div className="empty-state-text">날짜를 선택하면 거래를 볼 수 있습니다</div>
           </div>
           )}
         </div>
@@ -1115,55 +1183,6 @@ const TransactionsView: React.FC<{
           onRefresh();
         }}
         />
-      )}
-
-      {selectedMetric && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedMetric(null)}>
-          <div className="modal-content" style={{ maxWidth: 420 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div>
-                <div className="panel-title">{selectedMetric.title}</div>
-                <div className="panel-sub">{prevMonthLabel} → {month}</div>
-              </div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setSelectedMetric(null)}>
-                <Icons.Close />
-              </button>
-            </div>
-
-            <div className="transactions-table-lite manage-table" style={{ padding: 12, marginBottom: 12 }}>
-              <div className="tx-row manage-head" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>구분</div>
-                <div className="tx-col-amount" style={{ justifyContent: 'flex-end' }}>값</div>
-              </div>
-              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{prevMonthLabel}</div>
-                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
-                  {selectedMetric.type === 'count'
-                    ? `${selectedMetric.previous.toLocaleString()} 건`
-                    : formatCurrency(selectedMetric.previous, currency)}
-                </div>
-              </div>
-              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className="tx-col-label" style={{ justifyContent: 'flex-start' }}>{month}</div>
-                <div className="tx-amount tx-col-amount" style={{ justifyContent: 'flex-end' }}>
-                  {selectedMetric.type === 'count'
-                    ? `${selectedMetric.current.toLocaleString()} 건`
-                    : formatCurrency(selectedMetric.current, currency)}
-                </div>
-              </div>
-              <div className="tx-row manage-row" style={{ gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="tx-col-label" style={{ justifyContent: 'flex-start', fontWeight: 700 }}>증감</div>
-                <div className={`tx-amount tx-col-amount ${changeClass({ diff: selectedMetric.change.diff ?? 0 })}`} style={{ justifyContent: 'flex-end', fontWeight: 700 }}>
-                  {selectedMetric.change.pctText} / {selectedMetric.change.amountText || formatCurrency(selectedMetric.change.diff ?? 0, currency)}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn btn-primary" onClick={() => setSelectedMetric(null)}>닫기</button>
-            </div>
-          </div>
-        </div>
       )}
     </>
   );
@@ -1493,7 +1512,7 @@ const BudgetsView: React.FC<{
               <div className="tx-row" style={{ justifyContent: 'center' }}>
                 <div className="tx-main" style={{ justifyContent: 'center' }}>
                   <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
-                    예산이 없습니다. 추가 버튼을 눌러 등록하세요.
+                    예산이 없습니다. 
                   </div>
                 </div>
               </div>
@@ -1512,8 +1531,8 @@ const BudgetsView: React.FC<{
               <div className="tx-col-date">날짜</div>
               <div className="tx-col-label">카테고리</div>
               <div className="tx-col-amount">금액</div>
-              <div className="tx-col-account">Account</div>
-              <div className="tx-col-memo">Memo</div>
+              <div className="tx-col-account">계좌</div>
+              <div className="tx-col-memo">메모</div>
             </div>
             {expenseTransactions.map((t) => (
               <div key={t.id} className="tx-row manage-row">
@@ -1687,8 +1706,6 @@ const CategoriesView: React.FC<{
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <div className="panel-title">카테고리 관리</div>
-          <div className="panel-sub">수입/지출 카테고리를 관리합니다</div>
         </div>
         <button className="btn btn-primary" onClick={() => { setEditingCategory(null); setShowForm(true); }}>
           <Icons.Plus /> 새 카테고리
@@ -1706,7 +1723,6 @@ const CategoriesView: React.FC<{
         <div className="panel-header">
           <div>
             <div className="panel-title">지출 카테고리</div>
-            <div className="panel-sub">대분류와 소분류를 그리드 테이블로 표시합니다</div>
           </div>
         </div>
         <div className="transactions-table-lite categories-table">
@@ -2049,8 +2065,6 @@ const AccountsView: React.FC<{
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <div className="panel-title">계좌 관리</div>
-          <div className="panel-sub">저축통장, 신용카드, 체크카드 등을 관리합니다</div>
         </div>
         <button className="btn btn-primary" onClick={() => { setEditingAccount(null); setShowForm(true); }}>
           <Icons.Plus /> 새 계좌
@@ -2339,7 +2353,7 @@ const ReportsView: React.FC<{
         <div className="card" style={{ padding: 24 }}>
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
-              <div className="card-title">Activity Summary</div>
+              <div className="card-title">이번달 지출 추이</div>
             </div>
           </div>
           <div style={{ height: 320 }}>
@@ -2390,7 +2404,7 @@ const ReportsView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">연간 지출/수입 추이</div>
-              <div className="card-subtitle">{yearlyStats ? `${yearForTable}년` : ''}</div>
+              
             </div>
           </div>
           <div style={{ height: 320 }}>
@@ -2441,7 +2455,6 @@ const ReportsView: React.FC<{
           <div className="card-header" style={{ marginBottom: 12 }}>
             <div>
               <div className="card-title">지출 카테고리 분석</div>
-              <div className="card-subtitle">카테고리별 지출</div>
             </div>
           </div>
           <div style={{ height: 320 }}>
@@ -2540,11 +2553,9 @@ const SavingsView: React.FC<{
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <div className="panel-title">Savings Goals</div>
-          <div className="panel-sub">Track your savings progress</div>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          <Icons.Plus /> New Goal
+          <Icons.Plus /> 새 목표
         </button>
       </div>
 
@@ -2580,10 +2591,10 @@ const SavingsView: React.FC<{
         </div>
       ) : (
         <div className="empty-state" style={{ borderRadius: 20, padding: 60 }}>
-          <div className="empty-state-title">No Savings Goals</div>
-          <div className="empty-state-text">Create your first savings goal to start tracking progress.</div>
+          <div className="empty-state-title">저축 목표가 없습니다</div>
+          <div className="empty-state-text">첫 저축 목표를 만들어 진행 상황을 추적해보세요.</div>
           <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => setShowForm(true)}>
-            <Icons.Plus /> New Goal
+            <Icons.Plus /> 새 목표
           </button>
         </div>
       )}
