@@ -28,61 +28,49 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(140% 140% at 50% -25%, rgba(255,255,255,0.06), rgba(0,0,0,0.35));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 25px 55px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .transactions-table thead th {
-  padding: var(--space-4);
+  padding: 14px 12px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-tertiary);
+  color: rgba(214,224,238,0.9);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-}
-
-.transactions-table thead th:first-child {
-  border-top-left-radius: var(--radius-md);
-}
-
-.transactions-table thead th:last-child {
-  border-top-right-radius: var(--radius-md);
+  background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .transactions-table tbody tr {
-  transition: all var(--transition-fast);
-}
-
-.transactions-table tbody tr:hover {
-  background: var(--bg-tertiary);
+  transition: all 0.2s ease;
 }
 
 .transactions-table tbody td {
-  padding: var(--space-4);
+  padding: 14px 12px;
   font-size: 14px;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-color);
+  color: rgba(238,242,250,0.92);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .transactions-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-body[data-theme="dark"] .transactions-table thead th {
-  background: rgba(30, 30, 35, 0.6);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #c5c5d5;
+.transactions-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
 }
 
-body[data-theme="dark"] .transactions-table tbody tr:hover {
-  background: rgba(35, 35, 40, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-body[data-theme="dark"] .transactions-table tbody td {
-  border-color: rgba(255, 255, 255, 0.08);
+body[data-theme="light"] .transactions-table {
+  background: radial-gradient(140% 140% at 50% -25%, rgba(255,255,255,0.1), rgba(0,0,0,0.2));
+  border-color: rgba(0,0,0,0.08);
 }
 
 /* Badge */
@@ -289,4 +277,3 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
   background: rgba(239, 68, 68, 0.2);
   color: #F87171;
 }
-

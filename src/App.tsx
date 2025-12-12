@@ -105,7 +105,7 @@ useEffect(() => {
   const [view, setView] = useState<View>('dashboard');
   const [month, setMonth] = useState<string>(getMonthKey(new Date()));
   const [currency, setCurrency] = useState('₩');
-  const [theme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [userProfile, setUserProfile] = useState<User | null>(null);
   
   // Data states
@@ -145,10 +145,20 @@ useEffect(() => {
     []
   );
 
-  // Apply theme
   useEffect(() => {
-    document.body.setAttribute('data-theme', 'dark');
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+      setTheme(saved);
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    window.localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const monthLabel = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
@@ -319,6 +329,10 @@ useEffect(() => {
     setMonth(getMonthKey(next));
   }, [month]);
 
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   const handleLogout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
@@ -358,6 +372,7 @@ useEffect(() => {
   return (
     <>
       <CustomAlert />
+      <div className="bg" />
       <div className="app-root">
         <div className="app-shell">
           <aside className="sidebar">
@@ -393,15 +408,45 @@ useEffect(() => {
           </aside>
           <div className="app-content">
             <header className="app-header">
-              <div className="header-left" />
-              <div className="header-center">
+              <div className="header-left">
                 <div className="month-nav pill">
-                  <button onClick={goToPrevMonth}>{'<'}</button>
+                  <button onClick={goToPrevMonth} aria-label="이전 달로 이동">
+                    {'<'}
+                  </button>
                   <div className="month-label">{monthLabel}</div>
-                  <button onClick={goToNextMonth}>{'>'}</button>
+                  <button onClick={goToNextMonth} aria-label="다음 달로 이동">
+                    {'>'}
+                  </button>
                 </div>
               </div>
-              <div className="header-right" />
+              <div className="header-center" />
+              <div className="header-right">
+                <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label="테마 전환">
+                  <div className="theme-toggle-icon">
+                    <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                    <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                    </svg>
+                  </div>
+                </button>
+                <div className="alarm-icon" role="button" aria-label="알림">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                  <div className="alarm-badge" style={{ display: 'none' }}>0</div>
+                </div>
+              </div>
             </header>
             <main className="app-main">
               <section className="content">
