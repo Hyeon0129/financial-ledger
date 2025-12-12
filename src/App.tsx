@@ -1,5 +1,7 @@
 // Main App Component
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { supabase } from './lib/supabase'
+import AuthTest from './components/AuthTest'
 import type {
   Transaction, Category, Account, Budget, SavingsGoal, Loan,
   MonthlyStats
@@ -36,12 +38,77 @@ import './styles/components/savings.css';
 import './styles/components/shared.css';
 
 const App: React.FC = () => {
+const [authReady, setAuthReady] = useState(false);
+const [isLoggedIn, setIsLoggedIn] = useState(false);
+const monthReqRef = useRef(0);
+
+useEffect(() => {
+  let mounted = true;
+
+  // Supabase 세션 확인
+  supabase.auth.getSession().then(({ data, error }) => {
+    if (!mounted) return;
+    
+    if (error) {
+      console.error('세션 확인 에러:', error);
+    } else {
+      console.log('현재 세션:', data.session ? '로그인됨' : '로그아웃됨');
+    }
+    
+    setIsLoggedIn(!!data.session);
+    setAuthReady(true);
+  });
+
+  // Auth 상태 변경 리스너
+  const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Auth 상태 변경:', event, session ? '로그인됨' : '로그아웃됨');
+    setIsLoggedIn(!!session);
+    setAuthReady(true);
+  });
+
+  return () => {
+    mounted = false;
+    authListener?.subscription?.unsubscribe();
+  };
+}, []);
+
+useEffect(() => {
+  if (!isLoggedIn) return;
+
+  const ensureProfile = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      console.error('getUser error:', error);
+      return;
+    }
+
+    const user = data.user;
+
+    // profiles가 없으면 만들고, 있으면 유지(업데이트 최소화)
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert(
+        { id: user.id, email: user.email ?? '' },
+        { onConflict: 'id' }
+      );
+
+    if (upsertError) {
+      console.error('profiles upsert error:', upsertError);
+    }
+  };
+
+  ensureProfile();
+}, [isLoggedIn]);
+
+
+  
   const [view, setView] = useState<View>('dashboard');
   const [month, setMonth] = useState<string>(getMonthKey(new Date()));
   const [currency, setCurrency] = useState('₩');
   const [theme] = useState<'light' | 'dark'>('dark');
   
   // Data states
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -85,31 +152,42 @@ const App: React.FC = () => {
     return Object.values(uniqMap).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }, []);
 
-  // Load initial data
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const [user, cats, accs, goals, loanList] = await Promise.all([
-          userApi.get(),
-          categoriesApi.list(),
-          accountsApi.list(),
-          savingsGoalsApi.list(),
-          loansApi.list(),
-        ]);
-        setCurrency(user.currency);
-        setCategories(cats);
-        setAccounts(accs);
-        setSavingsGoals(goals);
-        setLoans(loanList);
-      } catch {
-        alert('서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.\\n\\n터미널에서 다음 명령어를 실행하세요:\\nnpm install\\nnpm run dev');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+  // Load initial data (로그인/인증 준비된 뒤에만)
+useEffect(() => {
+  if (!authReady) return;
+  if (!isLoggedIn) return;
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [user, cats, accs, goals, loanList] = await Promise.all([
+        userApi.get(),
+        categoriesApi.list(),
+        accountsApi.list(),
+        savingsGoalsApi.list(),
+        loansApi.list(),
+      ]);
+
+      setCurrency(user.currency);
+      setCategories(cats);
+      setAccounts(accs);
+      setSavingsGoals(goals);
+      setLoans(loanList);
+    } catch (e: unknown) {
+      // 인증/권한 타이밍 에러를 “서버 연결”로 오해하지 않게
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('loadData error:', msg);
+
+      // 필요하면 여기서만 alert 띄우고, 인증 계열은 조용히 처리
+      // showAlert('데이터 로딩 실패: ' + msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, [authReady, isLoggedIn]);
+
 
   const prevMonthKey = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
@@ -119,9 +197,15 @@ const App: React.FC = () => {
 
   // Load month-specific data
   useEffect(() => {
+    if (!authReady) return;
+    if (!isLoggedIn) return;
+  
+    const reqId = ++monthReqRef.current;
+  
     const loadMonthData = async () => {
       try {
         const year = Number(month.split('-')[0]);
+  
         const [txs, bds, monthStats, prevMonthStats, yrStats] = await Promise.all([
           transactionsApi.list({ month }),
           budgetsApi.list(),
@@ -129,17 +213,25 @@ const App: React.FC = () => {
           statsApi.monthly(prevMonthKey),
           statsApi.yearly(year),
         ]);
+  
+        // ✅ “가장 마지막 요청”만 state 반영
+        if (reqId !== monthReqRef.current) return;
+  
         setTransactions(normalizeTransactions(txs));
         setBudgets(bds);
         setStats(monthStats);
         setPrevStats(prevMonthStats);
         setYearlyStats(yrStats);
-      } catch {
-        // Silent error handling
+      } catch (e) {
+        if (reqId !== monthReqRef.current) return;
+        console.error('loadMonthData error:', e);
       }
     };
+  
     loadMonthData();
-  }, [month, normalizeTransactions, prevMonthKey]);
+  }, [authReady, isLoggedIn, month, normalizeTransactions, prevMonthKey]);
+  
+  
 
   // Refresh functions
   const refreshTransactions = useCallback(async () => {
@@ -188,6 +280,24 @@ const App: React.FC = () => {
     setSavingsGoals(goals);
   }, []);
 
+  // Auth 준비 대기
+  if (!authReady) {
+    return (
+      <div className="app-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0a0a' }}>
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <div className="loading-spinner" style={{ marginBottom: 16 }} />
+          <div>인증 확인 중...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인 안됨 - Auth 화면
+  if (!isLoggedIn) {
+    return <AuthTest />;
+  }
+
+  // 데이터 로딩 중
   if (loading) {
     return (
       <div className="app-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -196,6 +306,7 @@ const App: React.FC = () => {
     );
   }
 
+  // 메인 앱
   return (
     <>
       <CustomAlert />
@@ -349,4 +460,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

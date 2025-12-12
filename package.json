@@ -13,6 +13,7 @@
     "db:init": "echo \"db:init 비활성화됨\""
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.87.1",
     "better-sqlite3": "^11.6.0",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",

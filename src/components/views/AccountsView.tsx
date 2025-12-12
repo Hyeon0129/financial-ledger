@@ -167,7 +167,6 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
                 </div>
                 <div className="tx-col-date">{loan.next_due_date ? formatDate(loan.next_due_date) : '완납'}</div>
                 <div className="tx-col-actions">
-                  <button className="btn btn-sm" onClick={() => { setEditingLoan(loan); setShowLoanForm(true); }}>수정</button>
                   <button className="btn btn-sm" onClick={() => { setSettlingLoan(loan); setShowSettleForm(true); }}>상환</button>
                   <button className="btn btn-sm btn-danger" onClick={() => handleDeleteLoan(loan.id)}>삭제</button>
                 </div>
