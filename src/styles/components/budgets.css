@@ -1,0 +1,58 @@
+/* ========== Progress Bars ========== */
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+}
+
+body[data-theme="dark"] .progress-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+.progress-fill.success {
+  background: var(--success);
+}
+
+.progress-fill.over {
+  background: var(--danger);
+}
+
+/* Budget Row */
+.budget-row {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.budget-row:last-child {
+  border-bottom: none;
+}
+
+.budget-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.budget-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.budget-amounts {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-feature-settings: 'tnum';
+}
+

@@ -20,20 +20,7 @@ import {
 } from './components/views';
 import { viewMeta } from './components/common/utils';
 import type { View } from './components/common/utils';
-import { CustomAlert } from './components/common/CustomAlert';
-
-// Global styles
-import './styles/global.css';
-import './styles/layout.css';
-import './styles/common.css';
-import './styles/components/dashboard.css';
-import './styles/components/transactions.css';
-import './styles/components/budgets.css';
-import './styles/components/categories.css';
-import './styles/components/accounts.css';
-import './styles/components/reports.css';
-import './styles/components/savings.css';
-import './styles/components/shared.css';
+import './styles.css';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('dashboard');
@@ -188,6 +175,17 @@ const App: React.FC = () => {
     setSavingsGoals(goals);
   }, []);
 
+  // Calculate monthly spend per account
+  const monthlyAccountSpend = useMemo(() => {
+    const spend: Record<string, number> = {};
+    transactions.forEach((tx) => {
+      if (tx.type === 'expense' && tx.account_id) {
+        spend[tx.account_id] = (spend[tx.account_id] || 0) + tx.amount;
+      }
+    });
+    return spend;
+  }, [transactions]);
+
   if (loading) {
     return (
       <div className="app-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -197,10 +195,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <>
-      <CustomAlert />
-      <div className="app-root">
-        <header className="app-header">
+    <div className="app-root">
+      <header className="app-header">
         <div className="header-left">
           <img src="https://pyron.dev/_next/image?url=%2Fimages%2Flogo.png&w=48&q=75" alt="Logo" className="header-logo" />
         </div>
@@ -343,8 +339,7 @@ const App: React.FC = () => {
           )}
         </section>
       </main>
-      </div>
-    </>
+    </div>
   );
 };
 

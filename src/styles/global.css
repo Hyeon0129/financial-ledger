@@ -1,0 +1,161 @@
+/* ============================================
+   Ultra-Premium Minimal Finance App
+   Clean, Elegant, Professional
+   ============================================ */
+
+/* ========== CSS Variables ========== */
+:root {
+  /* Color Palette - Ultra Clean */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFAFA;
+  --bg-tertiary: #F7F7F7;
+  --bg-hover: #F5F5F5;
+  
+    /* Dark / Black Core */
+    --accent-dark-bg: #050608;
+    --accent-dark-soft: #10131a;
+    --accent-dark-elevated: #171b24;
+    --accent-dark-border: #2b3140;
+    --accent-dark-glow: rgba(148, 163, 184, 0.35);
+  
+    /* Signature Green (현재 스타일 유지 + 살짝 보정) */
+    --accent-green-main: #22c55e;
+    --accent-green-strong: #16a34a;
+    --accent-green-soft: #052917;
+    --accent-green-border: rgba(34, 197, 94, 0.55);
+    --accent-green-glow: rgba(34, 197, 94, 0.45);
+  
+    /* Premium Gold (다크테마 전용) */
+    --accent-gold-main: #f6c453;
+    --accent-gold-strong: #f59e0b;
+    --accent-gold-soft: #231506;
+    --accent-gold-border: rgba(245, 158, 11, 0.5);
+    --accent-gold-glow: rgba(245, 158, 11, 0.45);
+
+
+  /* Borders - Extremely Subtle */
+  --border-color: rgba(0, 0, 0, 0.06);
+  --border-hover: rgba(0, 0, 0, 0.12);
+  
+  /* Shadows - Very Minimal */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06);
+  
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  
+  /* Text Colors */
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-quaternary: #CCCCCC;
+  
+  /* Accent Colors */
+  --accent-primary: #000000;
+  --success: #10B981;
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  --info: #3B82F6;
+  
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Layout */
+  --sidebar-width: 240px;
+  --topbar-height: 64px;
+  --content-max-width: 1400px;
+}
+
+/* ========== Dark Theme ========== */
+/* ========== Dark Theme ========== */
+body[data-theme="dark"] {
+  --bg-primary: rgba(15, 15, 20, 0.8);
+  --bg-secondary: #050507;
+  --bg-tertiary: rgba(42, 42, 48, 0.65);
+  --bg-hover: rgba(55, 55, 65, 0.85);
+  
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  
+  --shadow-xs: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #d4d4d8;
+  --text-tertiary: #a1a1aa;
+  --text-quaternary: #71717a;
+  
+  --accent-primary: #FFFFFF;
+}
+
+body[data-theme="dark"] .panel-title,
+body[data-theme="dark"] .card-title,
+body[data-theme="dark"] h1,
+body[data-theme="dark"] h2,
+body[data-theme="dark"] h3,
+body[data-theme="dark"] h4 {
+  color: #FFFFFF !important;
+}
+
+body[data-theme="dark"] .card-value {
+  color: #FFFFFF !important;
+}
+
+/* ========== Reset & Base ========== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: #F8F9FA;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+body[data-theme="dark"] {
+  background: #0a0a0a;
+  background-image: 
+    radial-gradient(circle at 25% 30%, rgba(80, 80, 120, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 75% 70%, rgba(100, 80, 140, 0.12) 0%, transparent 45%);
+}
+

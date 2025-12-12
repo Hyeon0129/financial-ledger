@@ -1,0 +1,167 @@
+/* ========== Analytics List ========== */
+.analytics-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ========== Chart Styles ========== */
+.recharts-text {
+  fill: var(--text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+body[data-theme="dark"] .recharts-text {
+  fill: #A0A0A0 !important;
+}
+
+.recharts-legend-item-text {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+body[data-theme="dark"] .recharts-legend-item-text {
+  color: #FFFFFF !important;
+}
+
+.recharts-cartesian-axis-tick-value {
+  fill: var(--text-tertiary) !important;
+}
+
+body[data-theme="dark"] .recharts-cartesian-axis-tick-value {
+  fill: #A0A0A0 !important;
+}
+
+.recharts-label {
+  fill: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+body[data-theme="dark"] .recharts-label {
+  fill: #FFFFFF !important;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+body[data-theme="dark"] .recharts-default-tooltip {
+  background: rgba(20, 20, 25, 0.95) !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.recharts-tooltip-label {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+.recharts-tooltip-item-list {
+  padding: 0 !important;
+}
+
+.recharts-tooltip-item {
+  color: var(--text-secondary) !important;
+}
+
+
+
+.tx-col-label { justify-content: flex-start; text-align: left; }
+.tx-col-amount { text-align: center; }
+.tx-col-progress { justify-content: center; text-align: center; }
+.tx-col-memo { justify-content: center; text-align: center; }
+
+.currencies-card .tx-row { grid-template-columns: 0.6fr 1.2fr 0.7fr; }
+.currencies-card .tx-col-label { justify-content: flex-start; text-align: left; }
+.currencies-card .tx-col-amount { justify-content: center; text-align: center; }
+.currencies-card .tx-col-progress { justify-content: flex-end; text-align: center; align-items: flex-end; }
+.currencies-card .tx-progress { align-items: flex-end; margin-left: auto; margin-right: 0; width: 100%; display: flex; flex-direction: column; }
+
+.transactions-card .tx-row { grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr; }
+.transactions-card .tx-col-label { justify-content: flex-start; text-align: left; }
+.transactions-card .tx-col-amount { justify-content: center; text-align: center; }
+.transactions-card .tx-col-memo { justify-content: center; text-align: center; }
+
+
+/* Goals table overrides */
+.goals-table-lite .tx-amount-head span {
+  font-size: 12px;
+  color: #9aa2b2;
+  font-weight: 600;
+}
+
+.goal-amount {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+
+
+.goal-current {
+  color: #7a808f;
+  
+  font-weight: 700;
+}
+
+.goal-target {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.goal-sep {
+  color: #7a808f;
+}
+
+.goal-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Goals 테이블 전용 진행률 바 – 전체 톤에 맞게 그린 계열로 통일 */
+.goal-progress-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.goal-progress-bar {
+  width: 140px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);      /* 거의 안 보이는 어두운 트랙 */
+  overflow: hidden;
+}
+
+.goal-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #4ade80); /* 위 대시보드랑 같은 그린 느낌 */
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+}
+
+.goal-progress-text {
+  font-size: 11px;
+  color: #aeb6c4;
+  min-width: 32px;
+  text-align: right;
+}

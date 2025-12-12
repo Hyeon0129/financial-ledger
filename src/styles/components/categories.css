@@ -1,0 +1,54 @@
+/* ========== Category List ========== */
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.category-section h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-4);
+}
+
+.category-items {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.category-item:hover {
+  background: var(--bg-hover);
+}
+
+.category-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.category-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.category-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+

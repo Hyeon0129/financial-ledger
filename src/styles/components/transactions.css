@@ -1,0 +1,292 @@
+/* ========== Transaction Grid ========== */
+.transactions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.transaction-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+}
+
+.transaction-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* ========== Tables ========== */
+.transactions-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.transactions-table thead th {
+  padding: var(--space-4);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.transactions-table thead th:first-child {
+  border-top-left-radius: var(--radius-md);
+}
+
+.transactions-table thead th:last-child {
+  border-top-right-radius: var(--radius-md);
+}
+
+.transactions-table tbody tr {
+  transition: all var(--transition-fast);
+}
+
+.transactions-table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.transactions-table tbody td {
+  padding: var(--space-4);
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.transactions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+body[data-theme="dark"] .transactions-table thead th {
+  background: rgba(30, 30, 35, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #c5c5d5;
+}
+
+body[data-theme="dark"] .transactions-table tbody tr:hover {
+  background: rgba(35, 35, 40, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+body[data-theme="dark"] .transactions-table tbody td {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge.income {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.badge.expense {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+body[data-theme="dark"] .badge.income {
+  background: rgba(16, 185, 129, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+body[data-theme="dark"] .badge.expense {
+  background: rgba(239, 68, 68, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-color);
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* ========== Calendar ========== */
+/* ========== Calendar ========== */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.calendar-header {
+  background: transparent;
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.calendar-day {
+  background: #FFFFFF;
+  min-height: 100px;
+    padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.calendar-day:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.calendar-day.other-month {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.calendar-day.today {
+  background: rgba(120,120,120,0.12);
+  border-color: rgba(160,160,160,0.35);
+  box-shadow: none;
+}
+
+.calendar-day.today .calendar-day-number {
+  color: #E5E7EB;
+  font-weight: 800;
+}
+
+.calendar-day.today .calendar-transaction-item {
+  background: rgba(255, 255, 255, 0.12);
+  color: #E5E7EB;
+}
+
+.calendar-day.selected {
+  border: 2px solid #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 4px 20px rgba(102, 126, 234, 0.2);
+}
+
+body[data-theme="dark"] .calendar-header {
+  color: #A0A0A0;
+}
+
+body[data-theme="dark"] .calendar-day {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)),
+    rgba(20, 20, 25, 0.5);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body[data-theme="dark"] .calendar-day:hover {
+  background: rgba(25, 25, 30, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body[data-theme="dark"] .calendar-day.today {
+  background: rgba(120,120,120,0.14);
+  border-color: rgba(180,180,180,0.4);
+}
+
+body[data-theme="dark"] .calendar-day.selected {
+  border: 2px solid #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25), 0 4px 20px rgba(102, 126, 234, 0.3);
+}
+
+.calendar-day-number {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.calendar-transactions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.calendar-transaction-item {
+  padding: 5px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: -0.02em;
+}
+
+.calendar-transaction-item.income {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.calendar-transaction-item.expense {
+  background: rgba(239, 68, 68, 0.12);
+  color: #DC2626;
+}
+
+body[data-theme="dark"] .calendar-transaction-item.income {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+}
+
+body[data-theme="dark"] .calendar-transaction-item.expense {
+  background: rgba(239, 68, 68, 0.2);
+  color: #F87171;
+}
+

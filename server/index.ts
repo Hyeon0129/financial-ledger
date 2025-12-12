@@ -3,6 +3,23 @@ import cors from 'cors';
 import { db } from './db/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
+// ===== Common validators =====
+const isValidDateStrict = (value: string | undefined | null): boolean => {
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  const [y, m, day] = value.split('-').map(Number);
+  return (
+    d.getFullYear() === y &&
+    d.getMonth() === (m || 1) - 1 &&
+    d.getDate() === (day || 1)
+  );
+};
+
+const assertPositive = (num: unknown) => typeof num === 'number' && Number.isFinite(num) && num > 0;
+
+const normalizeMoney = (num: unknown) => (typeof num === 'number' ? Number(num) : Number(num ?? 0));
+
 // Basic transaction shape for type safety in this file
 type TransactionRow = {
   id: string;
@@ -11,6 +28,7 @@ type TransactionRow = {
   amount: number;
   category_id: string | null;
   account_id: string | null;
+  to_account_id: string | null;
   date: string;
   memo: string | null;
 };
@@ -23,6 +41,7 @@ app.use(express.json());
 
 // Demo user ID (in production, use auth middleware)
 const DEMO_USER_ID = 'demo-user';
+const AUTO_PROCESS_LOANS = process.env.AUTO_PROCESS_LOANS !== 'false';
 
 
 
@@ -124,19 +143,19 @@ const processLoans = () => {
     VALUES (?, ?, 'expense', ?, ?, ?, ?, ?)
   `);
   const existingTx = db.prepare(`
-    SELECT id FROM transactions 
-    WHERE user_id = ? AND memo = ? AND date = ? AND account_id = ?
+    SELECT id, account_id FROM transactions 
+    WHERE user_id = ? AND memo = ? AND date = ?
   `);
   // Broad duplicate detector for past 상환 기록 (old/new memo 형태 포함)
   // 신규 포맷: loan.id를 포함해 동일 계좌/날짜라도 대출별로 확실히 구분
   const existingTxLoanDay = db.prepare(`
-    SELECT id, memo FROM transactions 
-    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE ?
+    SELECT id, memo, account_id FROM transactions 
+    WHERE user_id = ? AND date = ? AND memo LIKE ?
   `);
   // 레거시 포맷(loan.id 미포함)도 한 번만 업데이트하도록 탐지 (후처리에서 loan.name으로 필터)
   const existingTxLoanDayLegacy = db.prepare(`
-    SELECT id, memo FROM transactions 
-    WHERE user_id = ? AND date = ? AND account_id = ? AND memo LIKE '%대출상환%'
+    SELECT id, memo, account_id FROM transactions 
+    WHERE user_id = ? AND date = ? AND memo LIKE '%대출상환%'
   `);
 
   loans.forEach((loan) => {
@@ -181,10 +200,10 @@ const processLoans = () => {
       if (payment > 0) {
         // 메모에 loan.id를 포함해 동일 계좌/날짜라도 대출별로 확실히 구분
         const memo = `[대출상환:${loan.id}] ${loan.name}:${paidMonths + 1}/${loan.term_months}`;
-        const dupExact = existingTx.get(DEMO_USER_ID, memo, nextDue, loan.account_id);
-        const dupSameLoan = existingTxLoanDay.get(DEMO_USER_ID, nextDue, loan.account_id, `[대출상환:${loan.id}]%`) as { id: string; memo: string } | undefined;
+        const dupExact = existingTx.get(DEMO_USER_ID, memo, nextDue) as { id: string; account_id: string } | undefined;
+        const dupSameLoan = existingTxLoanDay.get(DEMO_USER_ID, nextDue, `[대출상환:${loan.id}]%`) as { id: string; memo: string; account_id: string } | undefined;
         // 레거시: 같은 계좌/날짜라도 메모가 이 대출 이름으로 시작하는 경우만 승격 (다른 대출은 건드리지 않음)
-        const legacyCandidates = existingTxLoanDayLegacy.all(DEMO_USER_ID, nextDue, loan.account_id) as Array<{ id: string; memo: string }>;
+        const legacyCandidates = existingTxLoanDayLegacy.all(DEMO_USER_ID, nextDue) as Array<{ id: string; memo: string; account_id: string }>;
         const dupLegacy = legacyCandidates.find((row) => row.memo?.startsWith(`[대출상환] ${loan.name}:`));
         if (dupExact) {
           // 동일 메모가 이미 존재하면 새로 만들지 않음
@@ -220,7 +239,7 @@ const processLoans = () => {
 // ========== TRANSACTIONS ==========
 
 app.get('/api/transactions', (req, res) => {
-  processLoans();
+  if (AUTO_PROCESS_LOANS) processLoans();
   const { month, type, category_id } = req.query;
   
   let query = `
@@ -252,16 +271,44 @@ app.get('/api/transactions', (req, res) => {
 });
 
 app.post('/api/transactions', (req, res) => {
-  const { type, amount, category_id, account_id, date, memo } = req.body;
-  const id = uuidv4();
-  
-  db.prepare(`
-    INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, date, memo)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, DEMO_USER_ID, type, amount, category_id, account_id, date, memo);
+  const { type, amount, category_id, account_id, to_account_id, date, memo } = req.body;
+  const cleanType = type as TransactionRow['type'];
+  const numericAmount = normalizeMoney(amount);
 
-  if (type === 'income') adjustAccountBalance(account_id, amount);
-  else if (type === 'expense') adjustAccountBalance(account_id, -amount);
+  if (!['income', 'expense', 'transfer'].includes(cleanType)) {
+    return res.status(400).json({ error: 'invalid type' });
+  }
+  if (!assertPositive(numericAmount)) {
+    return res.status(400).json({ error: 'amount must be greater than 0' });
+  }
+  if (!isValidDateStrict(date)) {
+    return res.status(400).json({ error: 'invalid date' });
+  }
+
+  const isTransfer = cleanType === 'transfer';
+  if (isTransfer) {
+    if (!account_id || !to_account_id || account_id === to_account_id) {
+      return res.status(400).json({ error: 'transfer requires different from/to accounts' });
+    }
+  } else if (!account_id) {
+    return res.status(400).json({ error: 'account is required' });
+  }
+
+  const id = uuidv4();
+  const cleanCategoryId = isTransfer ? null : category_id;
+  const cleanMemo = memo?.toString().trim() || null;
+
+  db.prepare(`
+    INSERT INTO transactions (id, user_id, type, amount, category_id, account_id, to_account_id, date, memo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, DEMO_USER_ID, cleanType, numericAmount, cleanCategoryId, account_id, isTransfer ? to_account_id : null, date, cleanMemo);
+
+  if (cleanType === 'income') adjustAccountBalance(account_id, numericAmount);
+  else if (cleanType === 'expense') adjustAccountBalance(account_id, -numericAmount);
+  else {
+    adjustAccountBalance(account_id, -numericAmount);
+    adjustAccountBalance(to_account_id, numericAmount);
+  }
   
   const transaction = sanitizeTransaction(db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -276,24 +323,61 @@ app.post('/api/transactions', (req, res) => {
 
 app.put('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
-  const { type, amount, category_id, account_id, date, memo } = req.body;
+  const { type, amount, category_id, account_id, to_account_id, date, memo } = req.body;
 
   const existing = db.prepare(`SELECT * FROM transactions WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as TransactionRow | undefined;
   if (!existing) return res.status(404).send();
 
+  const cleanType = (type as TransactionRow['type']) ?? existing.type;
+  const numericAmount = amount === undefined ? existing.amount : normalizeMoney(amount);
+
+  if (!['income', 'expense', 'transfer'].includes(cleanType)) {
+    return res.status(400).json({ error: 'invalid type' });
+  }
+  if (!assertPositive(numericAmount)) {
+    return res.status(400).json({ error: 'amount must be greater than 0' });
+  }
+  if (date && !isValidDateStrict(date)) {
+    return res.status(400).json({ error: 'invalid date' });
+  }
+
+  const isTransfer = cleanType === 'transfer';
+  const fromAccount = account_id ?? existing.account_id;
+  const toAccount = isTransfer ? (to_account_id ?? existing.to_account_id) : null;
+
+  if (isTransfer) {
+    if (!fromAccount || !toAccount || fromAccount === toAccount) {
+      return res.status(400).json({ error: 'transfer requires different from/to accounts' });
+    }
+  } else if (!fromAccount) {
+    return res.status(400).json({ error: 'account is required' });
+  }
+
+  const cleanCategoryId = isTransfer ? null : category_id ?? existing.category_id;
+  const cleanMemo = memo?.toString().trim() ?? existing.memo;
+  const cleanDate = date ?? existing.date;
+
   // revert old balance
   if (existing.type === 'income') adjustAccountBalance(existing.account_id, -existing.amount);
   else if (existing.type === 'expense') adjustAccountBalance(existing.account_id, existing.amount);
+  else {
+    adjustAccountBalance(existing.account_id, existing.amount);
+    adjustAccountBalance(existing.to_account_id, -existing.amount);
+  }
   
   db.prepare(`
     UPDATE transactions 
-    SET type = ?, amount = ?, category_id = ?, account_id = ?, date = ?, memo = ?
+    SET type = ?, amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?
     WHERE id = ? AND user_id = ?
-  `).run(type, amount, category_id, account_id, date, memo, id, DEMO_USER_ID);
+  `).run(cleanType, numericAmount, cleanCategoryId, fromAccount, toAccount, cleanDate, cleanMemo, id, DEMO_USER_ID);
 
   // apply new balance
-  if (type === 'income') adjustAccountBalance(account_id, amount);
-  else if (type === 'expense') adjustAccountBalance(account_id, -amount);
+  if (cleanType === 'income') adjustAccountBalance(fromAccount, numericAmount);
+  else if (cleanType === 'expense') adjustAccountBalance(fromAccount, -numericAmount);
+  else {
+    adjustAccountBalance(fromAccount, -numericAmount);
+    adjustAccountBalance(toAccount, numericAmount);
+  }
   
   const transaction = sanitizeTransaction(db.prepare(`
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -312,6 +396,10 @@ app.delete('/api/transactions/:id', (req, res) => {
   if (existing) {
     if (existing.type === 'income') adjustAccountBalance(existing.account_id, -existing.amount);
     else if (existing.type === 'expense') adjustAccountBalance(existing.account_id, existing.amount);
+    else {
+      adjustAccountBalance(existing.account_id, existing.amount);
+      adjustAccountBalance(existing.to_account_id, -existing.amount);
+    }
   }
   db.prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?').run(id, DEMO_USER_ID);
   res.status(204).send();
@@ -329,6 +417,9 @@ app.get('/api/categories', (req, res) => {
 app.post('/api/categories', (req, res) => {
   const { name, type, parent_id, color, icon } = req.body;
   const id = uuidv4();
+
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  if (!['income', 'expense'].includes(type)) return res.status(400).json({ error: 'invalid type' });
   
   db.prepare(`
     INSERT INTO categories (id, user_id, name, type, parent_id, color, icon)
@@ -342,6 +433,8 @@ app.post('/api/categories', (req, res) => {
 app.put('/api/categories/:id', (req, res) => {
   const { id } = req.params;
   const { name, type, parent_id, color, icon } = req.body;
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  if (!['income', 'expense'].includes(type)) return res.status(400).json({ error: 'invalid type' });
   
   db.prepare(`
     UPDATE categories SET name = ?, type = ?, parent_id = ?, color = ?, icon = ?
@@ -370,11 +463,14 @@ app.get('/api/accounts', (req, res) => {
 app.post('/api/accounts', (req, res) => {
   const { name, type, balance, color, icon } = req.body;
   const id = uuidv4();
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  if (!['cash', 'bank', 'card', 'investment'].includes(type)) return res.status(400).json({ error: 'invalid type' });
+  const cleanBalance = Number(balance ?? 0);
   
   db.prepare(`
     INSERT INTO accounts (id, user_id, name, type, balance, color, icon)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, DEMO_USER_ID, name, type, balance || 0, color || '#6B7280', icon);
+  `).run(id, DEMO_USER_ID, name.trim(), type, cleanBalance, color || '#6B7280', icon);
   
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   res.status(201).json(account);
@@ -383,11 +479,14 @@ app.post('/api/accounts', (req, res) => {
 app.put('/api/accounts/:id', (req, res) => {
   const { id } = req.params;
   const { name, type, balance, color, icon } = req.body;
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  if (!['cash', 'bank', 'card', 'investment'].includes(type)) return res.status(400).json({ error: 'invalid type' });
+  const cleanBalance = Number(balance ?? 0);
   
   db.prepare(`
     UPDATE accounts SET name = ?, type = ?, balance = ?, color = ?, icon = ?
     WHERE id = ? AND user_id = ?
-  `).run(name, type, balance, color, icon, id, DEMO_USER_ID);
+  `).run(name.trim(), type, cleanBalance, color, icon, id, DEMO_USER_ID);
   
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   res.json(account);
@@ -401,7 +500,7 @@ app.delete('/api/accounts/:id', (req, res) => {
 
 // ========== LOANS ==========
 app.get('/api/loans', (req, res) => {
-  processLoans();
+  if (AUTO_PROCESS_LOANS) processLoans();
   const loans = db.prepare(`
     SELECT l.*, a.name as account_name, c.name as category_name, c.color as category_color
     FROM loans l
@@ -416,6 +515,15 @@ app.get('/api/loans', (req, res) => {
 app.post('/api/loans', (req, res) => {
   const { name, principal, interest_rate, term_months, start_date, monthly_due_day, account_id, category_id, repayment_type } = req.body;
   const id = uuidv4();
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  const principalNum = normalizeMoney(principal);
+  const interestNum = Number(interest_rate ?? 0);
+  const termNum = Number(term_months ?? 0);
+  if (!assertPositive(principalNum)) return res.status(400).json({ error: 'principal must be greater than 0' });
+  if (interestNum < 0) return res.status(400).json({ error: 'interest_rate must be >= 0' });
+  if (!assertPositive(termNum)) return res.status(400).json({ error: 'term_months must be greater than 0' });
+  if (!account_id) return res.status(400).json({ error: 'account_id is required' });
+  if (!isValidDateStrict(start_date)) return res.status(400).json({ error: 'invalid start_date' });
   const dueDay = Math.min(28, Math.max(1, Number(monthly_due_day || 1)));
   const repayType: 'amortized' | 'interest_only' | 'principal_equal' =
     repayment_type === 'interest_only'
@@ -423,7 +531,7 @@ app.post('/api/loans', (req, res) => {
       : repayment_type === 'principal_equal'
       ? 'principal_equal'
       : 'amortized';
-  const monthly_payment = calcMonthlyPayment(principal, interest_rate, term_months, repayType);
+  const monthly_payment = calcMonthlyPayment(principalNum, interestNum, termNum, repayType);
   const firstDue = getFirstDueDate(start_date, dueDay);
 
   db.prepare(`
@@ -432,10 +540,10 @@ app.post('/api/loans', (req, res) => {
   `).run(
     id,
     DEMO_USER_ID,
-    name,
-    principal,
-    interest_rate,
-    term_months,
+    name.trim(),
+    principalNum,
+    interestNum,
+    termNum,
     start_date,
     dueDay,
     account_id,
@@ -474,6 +582,16 @@ app.put('/api/loans/:id', (req, res) => {
     repayment_type = existing.repayment_type
   } = req.body;
 
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  const principalNum = normalizeMoney(principal);
+  const interestNum = Number(interest_rate ?? 0);
+  const termNum = Number(term_months ?? 0);
+  if (!assertPositive(principalNum)) return res.status(400).json({ error: 'principal must be greater than 0' });
+  if (interestNum < 0) return res.status(400).json({ error: 'interest_rate must be >= 0' });
+  if (!assertPositive(termNum)) return res.status(400).json({ error: 'term_months must be greater than 0' });
+  if (!account_id) return res.status(400).json({ error: 'account_id is required' });
+  if (!isValidDateStrict(start_date)) return res.status(400).json({ error: 'invalid start_date' });
+
   const dueDay = Math.min(28, Math.max(1, Number(monthly_due_day || existing.monthly_due_day || 1)));
   const repayType: 'amortized' | 'interest_only' | 'principal_equal' =
     repayment_type === 'interest_only'
@@ -481,7 +599,7 @@ app.put('/api/loans/:id', (req, res) => {
       : repayment_type === 'principal_equal'
       ? 'principal_equal'
       : 'amortized';
-  const monthly_payment = calcMonthlyPayment(principal, interest_rate, term_months, repayType);
+  const monthly_payment = calcMonthlyPayment(principalNum, interestNum, termNum, repayType);
 
   // Rebuild next due date based on paid months to avoid duplicates
   let nextDue = getFirstDueDate(start_date, dueDay);
@@ -492,11 +610,11 @@ app.put('/api/loans/:id', (req, res) => {
   // Remaining principal handling
   let remaining_principal = existing.remaining_principal;
   if (repayType === 'interest_only') {
-    remaining_principal = principal; // 이자만 상환 시 원금 유지
-  } else if (principal !== existing.principal) {
+    remaining_principal = principalNum; // 이자만 상환 시 원금 유지
+  } else if (principalNum !== existing.principal) {
     const paidRatio = existing.paid_months / Math.max(1, existing.term_months);
-    const assumedPaid = principal * paidRatio;
-    remaining_principal = Math.max(0, principal - assumedPaid);
+    const assumedPaid = principalNum * paidRatio;
+    remaining_principal = Math.max(0, principalNum - assumedPaid);
   }
 
   db.prepare(`
@@ -504,10 +622,10 @@ app.put('/api/loans/:id', (req, res) => {
     SET name = ?, principal = ?, interest_rate = ?, term_months = ?, start_date = ?, monthly_due_day = ?, account_id = ?, category_id = ?, monthly_payment = ?, remaining_principal = ?, next_due_date = ?, repayment_type = ?, settled_at = NULL
     WHERE id = ? AND user_id = ?
   `).run(
-    name,
-    principal,
-    interest_rate,
-    term_months,
+    name.trim(),
+    principalNum,
+    interestNum,
+    termNum,
     start_date,
     dueDay,
     account_id,
@@ -535,13 +653,15 @@ app.put('/api/loans/:id', (req, res) => {
 app.put('/api/loans/:id/settle', (req, res) => {
   const { id } = req.params;
   const { settled_at, amount, account_id } = req.body as { settled_at?: string; amount?: number; account_id?: string };
-  if (!settled_at) return res.status(400).json({ error: 'settled_at required' });
+  if (!settled_at || !isValidDateStrict(settled_at)) return res.status(400).json({ error: 'valid settled_at required' });
   const loan = db.prepare(`SELECT * FROM loans WHERE id = ? AND user_id = ?`).get(id, DEMO_USER_ID) as LoanRow | undefined;
   if (!loan) return res.status(404).send();
 
-  const payAmount = Math.max(0, amount ?? loan.remaining_principal);
+  const payAmountRaw = amount ?? loan.remaining_principal;
+  const payAmount = normalizeMoney(payAmountRaw);
+  if (!assertPositive(payAmount)) return res.status(400).json({ error: 'amount must be greater than 0' });
   const payAccount = account_id || loan.account_id;
-  if (payAmount > 0 && payAccount) {
+  if (payAccount) {
     const memo = `[대출상환완료] ${loan.name}`;
     const txId = uuidv4();
     db.prepare(`
@@ -607,6 +727,9 @@ app.get('/api/budgets', (req, res) => {
 
 app.post('/api/budgets', (req, res) => {
   const { category_id, amount } = req.body;
+  const numericAmount = normalizeMoney(amount);
+  if (!category_id) return res.status(400).json({ error: 'category_id is required' });
+  if (!assertPositive(numericAmount)) return res.status(400).json({ error: 'amount must be greater than 0' });
   
   // Check if permanent budget exists for this category
   const existing = db.prepare(`
@@ -614,13 +737,13 @@ app.post('/api/budgets', (req, res) => {
   `).get(DEMO_USER_ID, category_id) as { id: string } | undefined;
   
   if (existing) {
-    db.prepare(`UPDATE budgets SET amount = ? WHERE id = ?`).run(amount, existing.id);
+    db.prepare(`UPDATE budgets SET amount = ? WHERE id = ?`).run(numericAmount, existing.id);
   } else {
     const id = uuidv4();
     db.prepare(`
       INSERT INTO budgets (id, user_id, category_id, amount, month)
       VALUES (?, ?, ?, ?, 'permanent')
-    `).run(id, DEMO_USER_ID, category_id, amount);
+    `).run(id, DEMO_USER_ID, category_id, numericAmount);
   }
   
   const budget = db.prepare(`
@@ -651,11 +774,17 @@ app.get('/api/savings-goals', (req, res) => {
 app.post('/api/savings-goals', (req, res) => {
   const { name, target_amount, current_amount, deadline, color, icon } = req.body;
   const id = uuidv4();
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  const targetAmountNum = normalizeMoney(target_amount);
+  const currentAmountNum = normalizeMoney(current_amount ?? 0);
+  if (!assertPositive(targetAmountNum)) return res.status(400).json({ error: 'target_amount must be greater than 0' });
+  if (currentAmountNum < 0) return res.status(400).json({ error: 'current_amount must be >= 0' });
+  if (deadline && !isValidDateStrict(deadline)) return res.status(400).json({ error: 'invalid deadline' });
   
   db.prepare(`
     INSERT INTO savings_goals (id, user_id, name, target_amount, current_amount, deadline, color, icon)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, DEMO_USER_ID, name, target_amount, current_amount || 0, deadline, color || '#0A84FF', icon);
+  `).run(id, DEMO_USER_ID, name.trim(), targetAmountNum, currentAmountNum, deadline, color || '#0A84FF', icon);
   
   const goal = db.prepare('SELECT * FROM savings_goals WHERE id = ?').get(id);
   res.status(201).json(goal);
@@ -664,11 +793,17 @@ app.post('/api/savings-goals', (req, res) => {
 app.put('/api/savings-goals/:id', (req, res) => {
   const { id } = req.params;
   const { name, target_amount, current_amount, deadline, color, icon } = req.body;
+  if (!name?.toString().trim()) return res.status(400).json({ error: 'name is required' });
+  const targetAmountNum = normalizeMoney(target_amount);
+  const currentAmountNum = normalizeMoney(current_amount ?? 0);
+  if (!assertPositive(targetAmountNum)) return res.status(400).json({ error: 'target_amount must be greater than 0' });
+  if (currentAmountNum < 0) return res.status(400).json({ error: 'current_amount must be >= 0' });
+  if (deadline && !isValidDateStrict(deadline)) return res.status(400).json({ error: 'invalid deadline' });
   
   db.prepare(`
     UPDATE savings_goals SET name = ?, target_amount = ?, current_amount = ?, deadline = ?, color = ?, icon = ?
     WHERE id = ? AND user_id = ?
-  `).run(name, target_amount, current_amount, deadline, color, icon, id, DEMO_USER_ID);
+  `).run(name.trim(), targetAmountNum, currentAmountNum, deadline, color, icon, id, DEMO_USER_ID);
   
   const goal = db.prepare('SELECT * FROM savings_goals WHERE id = ?').get(id);
   res.json(goal);
@@ -683,7 +818,7 @@ app.delete('/api/savings-goals/:id', (req, res) => {
 // ========== STATISTICS ==========
 
 app.get('/api/stats/monthly', (req, res) => {
-  processLoans();
+  if (AUTO_PROCESS_LOANS) processLoans();
   const { month } = req.query;
   const targetMonth = month || new Date().toISOString().slice(0, 7);
   
@@ -760,7 +895,7 @@ app.get('/api/stats/monthly', (req, res) => {
 });
 
 app.get('/api/stats/yearly', (req, res) => {
-  processLoans();
+  if (AUTO_PROCESS_LOANS) processLoans();
   const year = req.query.year || new Date().getFullYear();
   
   const monthlyTrend = db.prepare(`
