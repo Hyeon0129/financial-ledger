@@ -87,7 +87,7 @@
   --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   /* Layout */
-  --sidebar-width: 240px;
+  --sidebar-width: 260px;
   --topbar-height: 64px;
   --content-max-width: 1400px;
 }
@@ -158,4 +158,3 @@ body[data-theme="dark"] {
     radial-gradient(circle at 25% 30%, rgba(80, 80, 120, 0.15) 0%, transparent 40%),
     radial-gradient(circle at 75% 70%, rgba(100, 80, 140, 0.12) 0%, transparent 45%);
 }
-

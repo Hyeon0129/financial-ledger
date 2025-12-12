@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase'
 import AuthTest from './components/AuthTest'
 import type {
   Transaction, Category, Account, Budget, SavingsGoal, Loan,
-  MonthlyStats
+  MonthlyStats, User
 } from './api';
 import {
   transactionsApi, categoriesApi, accountsApi, budgetsApi,
@@ -106,6 +106,7 @@ useEffect(() => {
   const [month, setMonth] = useState<string>(getMonthKey(new Date()));
   const [currency, setCurrency] = useState('₩');
   const [theme] = useState<'light' | 'dark'>('dark');
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   
   // Data states
 
@@ -131,6 +132,18 @@ useEffect(() => {
   const [prevStats, setPrevStats] = useState<MonthlyStats | null>(null);
   const [yearlyStats, setYearlyStats] = useState<{ year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> } | null>(null);
   const [loading, setLoading] = useState(true);
+  const navItems = useMemo<Array<{ key: View; label: string }>>(
+    () => [
+      { key: 'dashboard', label: '대시보드' },
+      { key: 'transactions', label: '거래 내역' },
+      { key: 'budgets', label: '예산 관리' },
+      { key: 'categories', label: '카테고리' },
+      { key: 'accounts', label: '계좌 관리' },
+      { key: 'reports', label: '리포트' },
+      { key: 'savings', label: '저축 목표' },
+    ],
+    []
+  );
 
   // Apply theme
   useEffect(() => {
@@ -169,6 +182,7 @@ useEffect(() => {
       ]);
 
       setCurrency(user.currency);
+      setUserProfile(user);
       setCategories(cats);
       setAccounts(accs);
       setSavingsGoals(goals);
@@ -280,6 +294,40 @@ useEffect(() => {
     setSavingsGoals(goals);
   }, []);
 
+  const profileLabel = useMemo(() => {
+    if (userProfile?.name?.trim()) return userProfile.name.trim();
+    if (userProfile?.email) {
+      const [idPart] = userProfile.email.split('@');
+      return idPart || userProfile.email;
+    }
+    return '프로필';
+  }, [userProfile]);
+  const profileInitial = useMemo(() => {
+    const base = (userProfile?.name || userProfile?.email || '?').trim();
+    return base ? base.charAt(0).toUpperCase() : '?';
+  }, [userProfile]);
+
+  const goToPrevMonth = useCallback(() => {
+    const [y, m] = month.split('-').map(Number);
+    const prev = new Date(y, m - 2, 1);
+    setMonth(getMonthKey(prev));
+  }, [month]);
+
+  const goToNextMonth = useCallback(() => {
+    const [y, m] = month.split('-').map(Number);
+    const next = new Date(y, m, 1);
+    setMonth(getMonthKey(next));
+  }, [month]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setIsLoggedIn(false);
+      setUserProfile(null);
+    }
+  }, []);
+
   // Auth 준비 대기
   if (!authReady) {
     return (
@@ -311,149 +359,120 @@ useEffect(() => {
     <>
       <CustomAlert />
       <div className="app-root">
-        <header className="app-header">
-        <div className="header-left">
-          <img src="https://pyron.dev/_next/image?url=%2Fimages%2Flogo.png&w=48&q=75" alt="Logo" className="header-logo" />
-        </div>
-        <nav className="header-center">
-          <button 
-            className={view === 'dashboard' ? 'active' : ''} 
-            onClick={() => setView('dashboard')}
-          >
-            대시보드
-          </button>
-          <button 
-            className={view === 'transactions' ? 'active' : ''} 
-            onClick={() => setView('transactions')}
-          >
-            거래 내역
-          </button>
-          <button 
-            className={view === 'budgets' ? 'active' : ''} 
-            onClick={() => setView('budgets')}
-          >
-            예산 관리
-          </button>
-          <button 
-            className={view === 'reports' ? 'active' : ''} 
-            onClick={() => setView('reports')}
-          >
-            리포트
-          </button>
-          <button 
-            className={view === 'categories' ? 'active' : ''} 
-            onClick={() => setView('categories')}
-          >
-            카테고리
-          </button>
-          <button 
-            className={view === 'accounts' ? 'active' : ''} 
-            onClick={() => setView('accounts')}
-          >
-            계좌 관리
-          </button>
-          <button 
-            className={view === 'savings' ? 'active' : ''} 
-            onClick={() => setView('savings')}
-          >
-            저축 목표
-          </button>
-        </nav>
-        <div className="header-right">
-          <div className="month-nav">
-            <button onClick={() => {
-              const [y, m] = month.split('-').map(Number);
-              const prev = new Date(y, m - 2, 1);
-              setMonth(getMonthKey(prev));
-            }}>{'<'}</button>
-            <div className="month-label">{monthLabel}</div>
-            <button onClick={() => {
-              const [y, m] = month.split('-').map(Number);
-              const next = new Date(y, m, 1);
-              setMonth(getMonthKey(next));
-            }}>{'>'}</button>
-          </div>
-        </div>
-      </header>
-      <main className="app-main">
-        <section className="content">
-          <div className="content-header">
-            <div className="page-heading" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <h1 className="page-title">{viewMeta[view].title}</h1>
-              {viewMeta[view].subtitle && (
-                <div className="page-subtitle">{viewMeta[view].subtitle}</div>
-              )}
+        <div className="app-shell">
+          <aside className="sidebar">
+            <div className="sidebar-logo">
+              <div className="sidebar-logo-mark">
+                <img src="https://pyron.dev/_next/image?url=%2Fimages%2Flogo.png&w=48&q=75" alt="Logo" />
+              </div>
+              <div className="sidebar-logo-text">
+                <div className="sidebar-logo-title">나의 가계부</div>
+                <div className="sidebar-logo-sub">SaaS Personal Finance</div>
+              </div>
             </div>
+            <nav className="sidebar-nav">
+              {navItems.map(item => (
+                <button
+                  key={item.key}
+                  className={view === item.key ? 'active' : ''}
+                  onClick={() => setView(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="sidebar-profile">
+              <div className="sidebar-profile-chip">
+                <div className="profile-avatar">{profileInitial}</div>
+                <div className="profile-name">{profileLabel}</div>
+              </div>
+              <button type="button" className="sidebar-logout" onClick={handleLogout}>
+                로그아웃
+              </button>
+            </div>
+          </aside>
+          <div className="app-content">
+            <header className="app-header">
+              <div className="header-left" />
+              <div className="header-center">
+                <div className="month-nav pill">
+                  <button onClick={goToPrevMonth}>{'<'}</button>
+                  <div className="month-label">{monthLabel}</div>
+                  <button onClick={goToNextMonth}>{'>'}</button>
+                </div>
+              </div>
+              <div className="header-right" />
+            </header>
+            <main className="app-main">
+              <section className="content">
+                <div className="content-header">
+                  <div className="page-heading" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <h1 className="page-title">{viewMeta[view].title}</h1>
+                    {viewMeta[view].subtitle && (
+                      <div className="page-subtitle">{viewMeta[view].subtitle}</div>
+                    )}
+                  </div>
+                </div>
+                {view === 'dashboard' && (
+                  <DashboardView
+                    stats={stats}
+                    prevStats={prevStats}
+                    transactions={transactions}
+                    budgets={budgets}
+                    savingsGoals={savingsGoals}
+                    categories={categories}
+                    accounts={accounts}
+                    currency={currency}
+                    month={month}
+                    onNavigate={setView}
+                    theme={theme}
+                  />
+                )}
+                {view === 'transactions' && (
+                  <TransactionsView
+                    transactions={transactions}
+                    categories={categories}
+                    accounts={accounts}
+                    currency={currency}
+                    month={month}
+                    onRefresh={refreshTransactions}
+                  />
+                )}
+                {view === 'budgets' && (
+                  <BudgetsView
+                    budgets={budgets}
+                    categories={categories}
+                    stats={stats}
+                    currency={currency}
+                    month={month}
+                    transactions={transactions}
+                    onRefresh={refreshBudgets}
+                  />
+                )}
+                {view === 'categories' && (
+                  <CategoriesView categories={categories} onRefresh={refreshCategories} />
+                )}
+                {view === 'accounts' && (
+                  <AccountsView
+                    accounts={accounts}
+                    currency={currency}
+                    monthlySpend={monthlyAccountSpend}
+                    categories={categories}
+                    loans={loans}
+                    onRefresh={refreshAccounts}
+                    onRefreshLoans={refreshLoans}
+                  />
+                )}
+                {view === 'reports' && (
+                  <ReportsView stats={stats} yearlyStats={yearlyStats} currency={currency} />
+                )}
+                {view === 'savings' && (
+                  <SavingsView goals={savingsGoals} currency={currency} onRefresh={refreshGoals} />
+                )}
+              </section>
+            </main>
           </div>
-          {view === 'dashboard' && (
-            <DashboardView 
-              stats={stats}
-              prevStats={prevStats}
-              transactions={transactions}
-              budgets={budgets}
-              savingsGoals={savingsGoals}
-              categories={categories}
-              accounts={accounts}
-              currency={currency}
-              month={month}
-              onNavigate={setView}
-              theme={theme}
-            />
-          )}
-          {view === 'transactions' && (
-            <TransactionsView
-              transactions={transactions}
-              categories={categories}
-              accounts={accounts}
-              currency={currency}
-              month={month}
-              onRefresh={refreshTransactions}
-            />
-          )}
-          {view === 'budgets' && (
-            <BudgetsView
-              budgets={budgets}
-              categories={categories}
-              stats={stats}
-              currency={currency}
-              month={month}
-              transactions={transactions}
-              onRefresh={refreshBudgets}
-            />
-          )}
-          {view === 'categories' && (
-            <CategoriesView
-              categories={categories}
-              onRefresh={refreshCategories}
-            />
-          )}
-          {view === 'accounts' && (
-            <AccountsView
-              accounts={accounts}
-              currency={currency}
-              monthlySpend={monthlyAccountSpend}
-              categories={categories}
-              loans={loans}
-              onRefresh={refreshAccounts}
-              onRefreshLoans={refreshLoans}
-            />
-          )}
-          {view === 'reports' && (
-            <ReportsView
-              stats={stats}
-              yearlyStats={yearlyStats}
-              currency={currency}
-            />
-          )}
-          {view === 'savings' && (
-            <SavingsView
-              goals={savingsGoals}
-              currency={currency}
-              onRefresh={refreshGoals}
-            />
-          )}
-        </section>
-      </main>
+        </div>
       </div>
     </>
   );

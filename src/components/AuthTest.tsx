@@ -1,248 +1,202 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, type FormEvent } from 'react';
+import { supabase } from '../lib/supabase';
+import '../styles/login.css';
 
 export default function AuthTest() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+  const [panel, setPanel] = useState<'login' | 'signup'>('login');
 
-  // Supabase 연결 테스트
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession()
-        if (error) {
-          console.error('Supabase 연결 에러:', error)
-          setError(`연결 에러: ${error.message}`)
-        } else {
-          console.log('Supabase 연결 성공:', data)
-          setMessage('Supabase 연결 성공 ✅')
-        }
-      } catch (err) {
-        console.error('예외 발생:', err)
-        setError(`예외: ${err}`)
-      }
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState('');
+  const [signupError, setSignupError] = useState('');
+  const [signupMessage, setSignupMessage] = useState('');
+  const [signupLoading, setSignupLoading] = useState(false);
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginMessage, setLoginMessage] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const isSignupPasswordShort = signupPassword.length > 0 && signupPassword.length < 6;
+  const handleSignup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSignupError('');
+    setSignupMessage('');
+
+    if (signupPassword !== signupPasswordConfirm) {
+      setSignupError('비밀번호가 일치하지 않습니다.');
+      return;
     }
-    testConnection()
-  }, [])
 
-  const signUp = async () => {
-    setLoading(true)
-    setError('')
-    setMessage('')
-    
+    setSignupLoading(true);
     try {
-      console.log('회원가입 시도:', email)
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-      
-      console.log('회원가입 응답:', { data, error })
-      
+      const { error } = await supabase.auth.signUp({
+        email: signupEmail,
+        password: signupPassword,
+      });
+
       if (error) {
-        setError(`회원가입 실패: ${error.message}`)
+        setSignupError(error.message);
       } else {
-        setMessage('회원가입 성공! 이메일을 확인해주세요.')
+        setSignupMessage('확인 메일을 보냈어요. 링크를 눌러 가입을 완료해 주세요.');
       }
     } catch (err) {
-      console.error('회원가입 예외:', err)
-      setError(`예외 발생: ${err}`)
+      setSignupError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false)
+      setSignupLoading(false);
     }
-  }
+  };
 
-  const signIn = async () => {
-    setLoading(true)
-    setError('')
-    setMessage('')
-    
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoginError('');
+    setLoginMessage('');
+    setLoginLoading(true);
     try {
-      console.log('로그인 시도:', email)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      
-      console.log('로그인 응답:', { data, error })
-      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
       if (error) {
-        setError(`로그인 실패: ${error.message}`)
+        setLoginError(error.message);
       } else {
-        setMessage('로그인 성공! ✅')
+        setLoginMessage('로그인 성공!');
       }
     } catch (err) {
-      console.error('로그인 예외:', err)
-      setError(`예외 발생: ${err}`)
+      setLoginError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false)
+      setLoginLoading(false);
     }
-  }
-
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut()
-      setMessage('로그아웃 완료')
-      setEmail('')
-      setPassword('')
-    } catch (err) {
-      setError(`로그아웃 실패: ${err}`)
-    }
-  }
+  };
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      minHeight: '100vh',
-      background: '#0a0a0a',
-      color: '#fff'
-    }}>
-      <div style={{ 
-        padding: 40, 
-        maxWidth: 400, 
-        width: '100%',
-        background: 'rgba(30, 30, 35, 0.98)',
-        borderRadius: 16,
-        border: '1px solid rgba(255, 255, 255, 0.08)'
-      }}>
-        <h2 style={{ marginBottom: 8, fontSize: 24 }}>Supabase Auth Test</h2>
-        <p style={{ marginBottom: 24, color: 'rgba(255, 255, 255, 0.6)', fontSize: 14 }}>
-          로그인/회원가입 테스트
-        </p>
+    <div className="auth-page">
+      <div className="bg" aria-hidden="true" />
+      <div className={`auth-container ${panel === 'signup' ? 'right-panel-active' : ''}`}>
+        <div className="form-container sign-up-container">
+          <form id="signup-form" autoComplete="off" onSubmit={handleSignup}>
+            <h1>회원가입</h1>
+            <p>아이디와 비밀번호를 만들어 시작하세요.</p>
 
-        {message && (
-          <div style={{ 
-            padding: 12, 
-            marginBottom: 16, 
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: 8,
-            color: '#22c55e',
-            fontSize: 14
-          }}>
-            {message}
-          </div>
-        )}
+            <div className="form-group">
+              <input
+                type="email"
+                className="form-input"
+                placeholder="이메일"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <input
+                type="password"
+                className="form-input"
+                placeholder="비밀번호"
+                minLength={6}
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+                aria-describedby="signup-password-hint"
+                required
+              />
+              <div
+                id="signup-password-hint"
+                className={`input-hint ${isSignupPasswordShort ? 'error' : ''}`}
+              >
+                비밀번호는 최소 6자 이상 입력해야 합니다.
+              </div>
+            </div>
+            <div className="form-group">
+              <input
+                type="password"
+                className="form-input"
+                placeholder="비밀번호 확인"
+                minLength={6}
+                value={signupPasswordConfirm}
+                onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                required
+              />
+              
+            </div>
 
-        {error && (
-          <div style={{ 
-            padding: 12, 
-            marginBottom: 16, 
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: 8,
-            color: '#ef4444',
-            fontSize: 14
-          }}>
-            {error}
-          </div>
-        )}
-
-        <input
-          type="email"
-          placeholder="이메일"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ 
-            width: '100%', 
-            marginBottom: 12,
-            padding: 12,
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: 8,
-            color: '#fff',
-            fontSize: 15
-          }}
-        />
-
-        <input
-          type="password"
-          placeholder="비밀번호 (최소 6자)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ 
-            width: '100%', 
-            marginBottom: 16,
-            padding: 12,
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: 8,
-            color: '#fff',
-            fontSize: 15
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <button 
-            onClick={signUp} 
-            disabled={loading}
-            style={{
-              flex: 1,
-              padding: 12,
-              background: 'rgba(34, 197, 94, 0.1)',
-              border: '1px solid rgba(34, 197, 94, 0.3)',
-              borderRadius: 8,
-              color: '#22c55e',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: 15,
-              fontWeight: 500
-            }}
-          >
-            {loading ? '처리중...' : '회원가입'}
-          </button>
-
-          <button 
-            onClick={signIn} 
-            disabled={loading}
-            style={{
-              flex: 1,
-              padding: 12,
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              borderRadius: 8,
-              color: '#3b82f6',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: 15,
-              fontWeight: 500
-            }}
-          >
-            {loading ? '처리중...' : '로그인'}
-          </button>
+            <button type="submit" className="submit-btn primary" disabled={signupLoading}>
+              {signupLoading ? '처리 중...' : '회원가입'}
+            </button>
+            <div
+              id="signup-error"
+              className={`feedback-text ${signupError ? 'error-text' : signupMessage ? 'success-text' : ''}`}
+              role="status"
+              aria-live="polite"
+            >
+              {signupError || signupMessage}
+            </div>
+          </form>
         </div>
 
-        <button 
-          onClick={signOut}
-          style={{
-            width: '100%',
-            padding: 12,
-            background: 'rgba(148, 163, 184, 0.1)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
-            borderRadius: 8,
-            color: '#94a3b8',
-            cursor: 'pointer',
-            fontSize: 15,
-            fontWeight: 500
-          }}
-        >
-          로그아웃
-        </button>
+        <div className="form-container sign-in-container">
+          <form id="login-form" autoComplete="off" onSubmit={handleLogin}>
+            <h1>로그인</h1>
+            <p>아이디와 비밀번호를 입력해 로그인하세요.</p>
 
-        <div style={{ 
-          marginTop: 24, 
-          padding: 12, 
-          background: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: 8,
-          fontSize: 12,
-          color: 'rgba(255, 255, 255, 0.4)'
-        }}>
-          💡 개발자 콘솔(F12)에서 자세한 로그를 확인하세요
+            <div className="form-group">
+              <input
+                type="email"
+                className="form-input"
+                placeholder="이메일"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <input
+                type="password"
+                className="form-input"
+                placeholder="비밀번호"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <a href="#" className="forgot-password" onClick={(e) => e.preventDefault()}>
+              비밀번호를 잊어버렸나요?
+            </a>
+            <button type="submit" className="submit-btn primary" disabled={loginLoading}>
+              {loginLoading ? '처리 중...' : '로그인'}
+            </button>
+            <div
+              id="login-error"
+              className={`feedback-text ${loginError ? 'error-text' : loginMessage ? 'success-text' : ''}`}
+              role="status"
+              aria-live="polite"
+            >
+              {loginError || loginMessage}
+            </div>
+          </form>
+        </div>
+
+        <div className="overlay-container" aria-hidden="true">
+          <div className="overlay">
+            <div className="overlay-panel overlay-left">
+              <h1>다시 오셨네요!</h1>
+              <p>기존 계정으로 로그인해서 계속 사용하세요.</p>
+              <button type="button" className="ghost-btn" onClick={() => setPanel('login')}>
+                로그인
+              </button>
+            </div>
+
+            <div className="overlay-panel overlay-right">
+              <h1>처음이신가요?</h1>
+              <p>계정을 만들고 가계부를 바로 시작해보세요.</p>
+              <button type="button" className="ghost-btn" onClick={() => setPanel('signup')}>
+                회원가입
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
