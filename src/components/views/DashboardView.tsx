@@ -7,6 +7,7 @@ import type {
 } from '../../api';
 import { formatCurrency, formatDateShort } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
+import { AccountCard } from '../common/AccountCard';
 import type { View } from '../common/utils';
 
 interface DashboardViewProps {
@@ -40,9 +41,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   
   // Delta
   const getDelta = (curr: number, prev: number) => {
-    if (!prev) return { val: 0, pct: '0.0' };
+    if (!prev) return { val: 0, pct: 0 };
     const diff = curr - prev;
-    return { val: diff, pct: ((diff / prev) * 100).toFixed(1) };
+    const pct = (diff / prev) * 100;
+    return { val: diff, pct };
   };
   const incomeDelta = getDelta(income, prevStats?.income ?? 0);
   const expenseDelta = getDelta(expense, prevStats?.expense ?? 0);
@@ -79,26 +81,89 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }));
   }, [stats]);
 
+  const monthlySpendByAccount = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions
+      .filter((t) => t.type === 'expense' && t.date.startsWith(month))
+      .forEach((t) => {
+        if (!t.account_id) return;
+        map[t.account_id] = (map[t.account_id] ?? 0) + t.amount;
+      });
+    return map;
+  }, [transactions, month]);
+
+
+
+
   if (!stats) return <div className="loading-spinner" />;
 
-  const KPICard = ({ title, value, iconPath, trend, trendVal, color }: any) => (
-    <LiquidPanel className="interactive">
-      <div className="kpi-head">
-        <div className="kpi-icon" style={{color: color || 'var(--text-muted)'}}>
-          <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><path d={iconPath} /></svg>
+  type TrendDir = 'up' | 'down';
+  type KPICardProps = {
+    title: string;
+    value: React.ReactNode;
+    iconPath: string;
+    trend: TrendDir;
+    trendPct: number;
+    intent?: 'good' | 'bad' | 'neutral';
+  };
+
+  const KPICard: React.FC<KPICardProps> = ({ title, value, iconPath, trend, trendPct, intent }) => {
+    const pctText = `${Math.abs(trendPct).toFixed(2)}%`;
+    const pillClass =
+      intent === 'neutral' ? 'neutral' : trend === 'up' ? 'up' : 'down';
+
+    return (
+      <LiquidPanel className="interactive kpi-card">
+        <div className="kpi-top">
+          <div className="kpi-iconBtn" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor">
+              <path d={iconPath} />
+            </svg>
+          </div>
+          <button className="kpi-menuBtn" type="button" aria-label="More">
+            <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor">
+              <circle cx="128" cy="128" r="12" />
+              <circle cx="60" cy="128" r="12" />
+              <circle cx="196" cy="128" r="12" />
+            </svg>
+          </button>
         </div>
-        <svg width="20" height="20" viewBox="0 0 256 256" fill="var(--text-muted)" style={{opacity:0.5}}><circle cx="128" cy="128" r="12"/><circle cx="60" cy="128" r="12"/><circle cx="196" cy="128" r="12"/></svg>
+        <div className="kpi-title">{title}</div>
+        <div className="kpi-value">{value}</div>
+        <div className="kpi-sub">
+          <span className={`kpi-pill ${pillClass}`}>
+            {trend === 'up' ? '+' : '-'}
+            {pctText}
+          </span>
+          <span className="kpi-subText">from last month</span>
+        </div>
+      </LiquidPanel>
+    );
+  };
+
+  const renderRangeBar = (progress: number) => {
+    const segments = 52;
+    const filled = Math.min(segments, Math.round((progress / 100) * segments));
+    return (
+      <div className="limit-range">
+        <div className="limit-range-label">52 week range</div>
+        <div className="limit-range-bar" aria-hidden="true">
+          {Array.from({ length: segments }).map((_, i) => {
+            const isActive = i < filled;
+            const hue = 10 + (110 * i) / (segments - 1); // red -> green
+            const activeColor = `hsl(${hue} 90% 55%)`;
+            return (
+              <span
+                key={i}
+                className={`limit-tick ${isActive ? 'active' : ''}`}
+                style={isActive ? { background: activeColor } : undefined}
+              />
+            );
+          })}
+        </div>
       </div>
-      <div className="kpi-label">{title}</div>
-      <div className="kpi-value">{value}</div>
-      <div className="kpi-sub">
-        <span className={`trend ${trend === 'up' ? 'up' : 'down'}`}>
-          {trend === 'up' ? '+' : ''}{trendVal}%
-        </span>
-        <span>from last month</span>
-      </div>
-    </LiquidPanel>
-  );
+    );
+  };
 
   return (
     <div className="dashboard-grid">
@@ -109,93 +174,113 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Total Revenue" 
           value={formatCurrency(income, currency)} 
           iconPath="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm45.66-93.66a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,11.32-11.32L120,132.69V88a8,8,0,0,1,16,0v44.69l10.34-10.35A8,8,0,0,1,173.66,122.34Z"
-          trend={Number(incomeDelta.pct) >= 0 ? 'up' : 'down'}
-          trendVal={incomeDelta.pct}
-          color="var(--accent-green)"
+          trend={incomeDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={incomeDelta.pct}
         />
         <KPICard 
           title="Total Expense" 
           value={formatCurrency(expense, currency)} 
           iconPath="M216,72H40a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8H216a8,8,0,0,0,8-8V80A8,8,0,0,0,216,72Zm-8,120H48V88H208Zm-48-24a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,160,168Z"
-          trend={Number(expenseDelta.pct) <= 0 ? 'up' : 'down'}
-          trendVal={expenseDelta.pct}
-          color="var(--accent-red)"
+          trend={expenseDelta.pct <= 0 ? 'up' : 'down'}
+          trendPct={expenseDelta.pct}
         />
         <KPICard 
           title="Net Growth" 
           value={formatCurrency(balance, currency)} 
           iconPath="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H224A8,8,0,0,1,232,208ZM164.24,93.42l-42.6,42.6-30.22-22.66a8,8,0,0,0-10.84,1.08l-48,56a8,8,0,1,0,12.19,10.42L88,130.63l30.22,22.66a8,8,0,0,0,10.84-1.08l48-48,35.15,29.29a8,8,0,1,0,10.25-12.3l-48-40A8,8,0,0,0,164.24,93.42Z"
-          trend={Number(balanceDelta.pct) >= 0 ? 'up' : 'down'}
-          trendVal={balanceDelta.pct}
-          color="var(--accent-blue)"
+          trend={balanceDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={balanceDelta.pct}
         />
         <KPICard 
           title="Transactions" 
           value={txCount} 
           iconPath="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208ZM149.66,101.66a8,8,0,0,1,0,11.31l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,11.32-11.32L96,112.69V64a8,8,0,0,1,16,0v48.69l10.34-10.35A8,8,0,0,1,149.66,101.66Zm32,72H74.34a8,8,0,0,1,0-16H181.66a8,8,0,0,1,0,16Z"
           trend="up"
-          trendVal="0.0"
-          color="var(--accent-orange)"
+          trendPct={0}
+          intent="neutral"
         />
       </section>
 
       {/* ROW 2: CHART & WIDGETS */}
       <section className="grid-row-2">
         
-        {/* Main Chart (Sales Overview) */}
-        <LiquidPanel className="interactive">
-          <div className="panel-header">
-            <div className="panel-title">Sales Overview</div>
-            <div className="panel-actions">Daily Trend</div>
-          </div>
-          
-          <div className="sales-stats">
-            <div className="stat-item">
-              <h4>Total Income</h4>
-              <p>{formatCurrency(income, currency)}</p>
-            </div>
-            <div className="stat-item">
-              <h4>Total Expense</h4>
-              <p>{formatCurrency(expense, currency)}</p>
+        {/* Main Chart */}
+        <LiquidPanel className="interactive overview-panel">
+          <div className="overview-header">
+            <div className="overview-title">Sales Overview</div>
+            <div className="overview-actions">
+              <button className="overview-select" type="button">
+                Daily Trend
+                <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">
+                  <path d="M128,188a8,8,0,0,1-5.66-2.34l-80-80a8,8,0,0,1,11.32-11.32L128,168.69l74.34-74.35a8,8,0,0,1,11.32,11.32l-80,80A8,8,0,0,1,128,188Z" />
+                </svg>
+              </button>
+              <button className="overview-menuBtn" type="button" aria-label="More">
+                <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor">
+                  <circle cx="128" cy="128" r="12" />
+                  <circle cx="60" cy="128" r="12" />
+                  <circle cx="196" cy="128" r="12" />
+                </svg>
+              </button>
             </div>
           </div>
 
-          <div className="chart-container">
+          <div className="overview-meta">
+            <div className="overview-stats">
+              <div className="overview-stat">
+                <div className="overview-statLabel">Total Earnings</div>
+                <div className="overview-statValue">{formatCurrency(income, currency)}</div>
+                <div className={`overview-statDelta ${incomeDelta.pct >= 0 ? 'positive' : 'negative'}`}>
+                  {incomeDelta.pct >= 0 ? '+' : '-'}
+                  {Math.abs(incomeDelta.pct).toFixed(2)}%
+                </div>
+              </div>
+              <div className="overview-stat">
+                <div className="overview-statLabel">Total Expenditure</div>
+                <div className="overview-statValue">{formatCurrency(expense, currency)}</div>
+                <div className={`overview-statDelta ${expenseDelta.pct <= 0 ? 'positive' : 'negative'}`}>
+                  {expenseDelta.pct <= 0 ? '+' : '-'}
+                  {Math.abs(expenseDelta.pct).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+
+            <div className="overview-legend" aria-hidden="true">
+              <div className="legend-item">
+                <span className="legend-dot earning" />
+                <span>Earning</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot expenditure" />
+                <span>Expenditure</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="overview-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barGap={6}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill:'var(--text-muted)', fontSize:11}} 
+              <BarChart data={chartData} barGap={8}>
+                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
                   dy={10}
                 />
-                <Tooltip 
-                  cursor={{fill:'rgba(255,255,255,0.05)'}}
+                <Tooltip
+                  cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   contentStyle={{
-                    backgroundColor: 'rgba(20, 20, 35, 0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    borderRadius: 12,
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-                    color: '#fff'
+                    backgroundColor: 'rgba(10, 12, 16, 0.92)',
+                    borderColor: 'rgba(255,255,255,0.12)',
+                    borderRadius: 14,
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
+                    color: '#fff',
                   }}
-                  itemStyle={{ color: '#fff' }}
-                  labelStyle={{ color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}
                   formatter={(val: number) => formatCurrency(val, currency)}
                 />
-                <Bar 
-                  dataKey="Income" 
-                  fill="var(--accent-orange)" 
-                  radius={[4,4,4,4]} 
-                  barSize={12} 
-                />
-                <Bar 
-                  dataKey="Expense" 
-                  fill="rgba(255,255,255,0.15)" 
-                  radius={[4,4,4,4]} 
-                  barSize={12} 
-                />
+                <Bar dataKey="Income" fill="var(--accent-orange)" radius={[6, 6, 6, 6]} barSize={12} />
+                <Bar dataKey="Expense" fill="rgba(255,255,255,0.14)" radius={[6, 6, 6, 6]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -208,20 +293,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <LiquidPanel className="interactive" style={{flex:'0 0 auto'}}>
             <div className="panel-header">
               <div className="panel-title">Monthly Limit</div>
-              <div className="panel-actions" onClick={() => onNavigate('budgets')}>Set</div>
+              <div className="panel-actions" onClick={() => onNavigate('budgets')}>Manage</div>
             </div>
             
             <div className="limit-widget">
               <div className="limit-info">
-                <div className="limit-val">{formatCurrency(budgetRemaining, currency)}</div>
-                <div className="limit-sub">Remaining</div>
+                <div className="limit-val">{Math.round(budgetProgress)}%</div>
+                <div className="limit-sub">{formatCurrency(budgetRemaining, currency)} Left</div>
               </div>
-              <div className="limit-bar-bg">
-                <div className="limit-bar-fill" style={{width: `${Math.min(100, budgetProgress)}%`}} />
-              </div>
-              <div className="limit-sub" style={{marginTop:8, display:'flex', justifyContent:'space-between'}}>
-                <span>{Math.round(budgetProgress)}% Used</span>
-                <span>Total: {formatCurrency(totalBudget, currency)}</span>
+              
+              {renderRangeBar(budgetProgress)}
+              
+              <div className="limit-sub" style={{marginTop:8, textAlign:'right'}}>
+                Total: {formatCurrency(totalBudget, currency)}
               </div>
             </div>
           </LiquidPanel>
@@ -257,26 +341,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ROW 3: ACCOUNTS & TREND */}
       <section className="grid-row-3">
         
-        {/* Accounts List (Cards) */}
+        {/* Accounts List (Grid) */}
         <LiquidPanel className="interactive">
           <div className="panel-header">
             <div className="panel-title">My Cards</div>
-            <div className="panel-actions" onClick={() => onNavigate('accounts')}>All</div>
+            <div className="panel-actions" onClick={() => onNavigate('accounts')}>Manage</div>
           </div>
-          <div className="account-grid">
-            {accounts.map(acc => (
-              <div key={acc.id} className="account-card">
-                <div className="acc-icon">
-                  <svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V72H40V56Zm0,144H40V88H216V200Zm-24-40a8,8,0,1,1-8-8A8,8,0,0,1,192,160Z"/></svg>
-                </div>
-                <div>
-                  <div className="acc-name">{acc.name}</div>
-                  <div className="acc-bal">{formatCurrency(acc.balance, currency)}</div>
-                </div>
-              </div>
-            ))}
-            {accounts.length === 0 && <div className="text-muted" style={{padding:20}}>No accounts added.</div>}
-          </div>
+          
+          {accounts.length > 0 ? (
+            <div className="accounts-grid">
+              {accounts.map((acc, idx) => (
+                <AccountCard
+                  key={acc.id}
+                  account={acc}
+                  index={idx}
+                  currency={currency}
+                  monthlySpend={monthlySpendByAccount[acc.id] ?? 0}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted" style={{padding:40, textAlign:'center'}}>No accounts added.</div>
+          )}
         </LiquidPanel>
 
         {/* Top Spending Categories Trend */}

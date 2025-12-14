@@ -4,6 +4,7 @@ import type { Budget, Category, Transaction, MonthlyStats } from '../../api';
 import { budgetsApi, formatCurrency, formatDate } from '../../api';
 import { Icons } from '../common/Icons';
 import { showAlert, showConfirm } from '../common/alertHelpers';
+import { LiquidPanel } from '../common/LiquidPanel';
 
 interface BudgetsViewProps {
   budgets: Budget[];
@@ -90,8 +91,8 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
 
   return (
     <>
-      <div className="panel budget-grid">
-        <div className="panel-main budget-half">
+      <div className="budget-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <LiquidPanel>
           <div className="panel-header">
             <div>
               <div className="panel-title">예산 관리</div>
@@ -101,84 +102,78 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           </div>
 
           <div className="transactions-table-lite budgets-table">
-            <div className="tx-row manage-head">
+            <div className="tx-row manage-head" style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr 1fr 0.8fr', padding:'12px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
               <div className="tx-col-label">카테고리</div>
-              <div className="tx-col-amount">예산</div>
-              <div className="tx-col-amount">사용액</div>
-              <div className="tx-col-amount">잔액</div>
-              <div className="tx-col-actions">작업</div>
+              <div className="tx-col-amount text-right">예산</div>
+              <div className="tx-col-amount text-right">사용액</div>
+              <div className="tx-col-amount text-right">잔액</div>
+              <div className="tx-col-actions text-center">작업</div>
             </div>
             {budgets.map((budget) => {
               const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
               const remaining = Math.max(0, budget.amount - spent);
               return (
-                <div key={budget.id} className="tx-row manage-row">
-                  <div className="tx-main tx-col-label">
-                    <span className="tx-dot" style={{ background: budget.category_color || '#60a5fa' }} />
+                <div key={budget.id} className="tx-row manage-row" style={{display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr 1fr 0.8fr', padding:'12px', borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                  <div className="tx-main tx-col-label" style={{display:'flex', alignItems:'center', gap:8}}>
+                    <span className="tx-dot" style={{ width:8, height:8, borderRadius:'50%', background: budget.category_color || '#60a5fa' }} />
                     <div className="tx-main-text">
-                      <div className="tx-name">{budget.category_name}</div>
+                      <div className="tx-name" style={{fontWeight:600}}>{budget.category_name}</div>
                     </div>
                   </div>
-                  <div className="tx-amount tx-col-amount">{formatCurrency(budget.amount, currency)}</div>
-                  <div className="tx-amount tx-col-amount negative">{formatCurrency(spent, currency)}</div>
-                  <div className="tx-amount tx-col-amount positive">{formatCurrency(remaining, currency)}</div>
-                  <div className="tx-col-actions">
-                    <button className="btn btn-sm" onClick={() => openEdit(budget)}>수정</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
-                  </div>
-                </div>
-              );
-            })}
+                  <div className="tx-amount tx-col-amount text-right">{formatCurrency(budget.amount, currency)}</div>
+	                  <div className="tx-amount tx-col-amount negative text-right">{formatCurrency(spent, currency)}</div>
+	                  <div className="tx-amount tx-col-amount positive text-right">{formatCurrency(remaining, currency)}</div>
+	                  <div className="tx-col-actions text-center">
+	                    <div style={{display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap'}}>
+	                      <button className="btn btn-sm" onClick={() => openEdit(budget)}>수정</button>
+	                      <button className="btn btn-sm btn-danger" onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
+	                    </div>
+	                  </div>
+	                </div>
+	              );
+	            })}
             {budgets.length === 0 && (
-              <div className="tx-row" style={{ justifyContent: 'center' }}>
-                <div className="tx-main" style={{ justifyContent: 'center' }}>
-                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
-                    예산이 없습니다. 
-                  </div>
-                </div>
+              <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
+                예산이 없습니다. 
               </div>
             )}
           </div>
-        </div>
+        </LiquidPanel>
 
-        <div className="panel-side budget-half">
+        <LiquidPanel>
           <div className="panel-header">
             <div>
               <div className="panel-title">지출 내역</div>
             </div>
           </div>
           <div className="transactions-table-lite budgets-expense-table manage-table">
-            <div className="tx-row manage-head">
-              <div className="tx-col-date">날짜</div>
+            <div className="tx-row manage-head" style={{display:'grid', gridTemplateColumns:'0.8fr 1.2fr 1fr 1fr 1.5fr', padding:'12px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+              <div className="tx-col-date text-center">날짜</div>
               <div className="tx-col-label">카테고리</div>
-              <div className="tx-col-amount">금액</div>
-              <div className="tx-col-account">계좌</div>
+              <div className="tx-col-amount text-right">금액</div>
+              <div className="tx-col-account text-center">계좌</div>
               <div className="tx-col-memo">메모</div>
             </div>
             {expenseTransactions.map((t) => (
-              <div key={t.id} className="tx-row manage-row">
-                <div className="tx-col-date">{formatDate(t.date)}</div>
+              <div key={t.id} className="tx-row manage-row" style={{display:'grid', gridTemplateColumns:'0.8fr 1.2fr 1fr 1fr 1.5fr', padding:'12px', borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                <div className="tx-col-date text-center" style={{fontSize:12, color:'var(--text-muted)'}}>{formatDate(t.date)}</div>
                 <div className="tx-main tx-col-label">
                   <div className="tx-main-text">
-                    <div className="tx-name">{t.category_name}</div>
+                    <div className="tx-name" style={{fontWeight:600}}>{t.category_name}</div>
                   </div>
                 </div>
-                <div className="tx-amount tx-col-amount negative">{formatCurrency(t.amount, currency)}</div>
-                <div className="tx-col-account">{t.account_name || '-'}</div>
-                <div className="tx-col-memo">{t.memo || '-'}</div>
+                <div className="tx-amount tx-col-amount negative text-right">{formatCurrency(t.amount, currency)}</div>
+                <div className="tx-col-account text-center" style={{fontSize:12}}>{t.account_name || '-'}</div>
+                <div className="tx-col-memo" style={{fontSize:12, color:'var(--text-muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.memo || '-'}</div>
               </div>
             ))}
             {expenseTransactions.length === 0 && (
-              <div className="tx-row" style={{ justifyContent: 'center' }}>
-                <div className="tx-main" style={{ justifyContent: 'center' }}>
-                  <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
-                    지출 내역이 없습니다.
-                  </div>
-                </div>
+              <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
+                지출 내역이 없습니다.
               </div>
             )}
           </div>
-        </div>
+        </LiquidPanel>
       </div>
 
       {showModal && (
@@ -229,7 +224,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                   onChange={(e) => setAmount(e.target.value)}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>취소</button>
                 <button type="submit" className="btn btn-primary">저장</button>
               </div>
@@ -240,4 +235,3 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     </>
   );
 };
-

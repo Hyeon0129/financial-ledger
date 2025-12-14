@@ -4,6 +4,7 @@ import type { Category } from '../../api';
 import { categoriesApi } from '../../api';
 import { Icons } from '../common/Icons';
 import { showAlert, showConfirm } from '../common/alertHelpers';
+import { LiquidPanel } from '../common/LiquidPanel';
 
 interface CategoriesViewProps {
   categories: Category[];
@@ -52,97 +53,112 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div></div>
+        <h2 className="panel-title">Categories</h2>
         <button className="btn btn-primary" onClick={() => { setEditingCategory(null); setShowForm(true); }}>
           <Icons.Plus /> 새 카테고리
         </button>
       </div>
 
-      <CategoryList 
-        items={incomeCategories} 
-        title="수입 카테고리" 
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      <div className="panel-main categories-panel">
+      <LiquidPanel style={{marginBottom: 24}}>
         <div className="panel-header">
-          <div>
-            <div className="panel-title">지출 카테고리</div>
-          </div>
+          <div className="panel-title">수입 카테고리</div>
         </div>
-        <div className="transactions-table-lite categories-table">
-          <div className="tx-row categories-head">
-            <div className="tx-col-label">대분류</div>
-            <div className="tx-col-child">소분류</div>
-            <div className="tx-col-type">구분</div>
-            <div className="tx-col-actions">작업</div>
-          </div>
-
-          {expenseTree.grouped.map(({ parent, children }) => (
-            <React.Fragment key={parent.id}>
-              <div className="tx-row category-parent-row">
-                <div className="tx-main tx-col-label">
-                  <span className="tx-dot" style={{ background: parent.color }} />
-                  <div className="tx-main-text">
-                    <div className="tx-name">{parent.name}</div>
-                  </div>
-                </div>
-                <div className="tx-col-child muted">-</div>
-                <div className="tx-col-type">대분류</div>
-                <div className="tx-col-actions">
-                  <button className="btn btn-sm" onClick={() => handleEdit(parent)}>수정</button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>삭제</button>
-                </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          {incomeCategories.map((cat) => (
+            <div key={cat.id} style={{ 
+              background: 'rgba(255,255,255,0.05)', 
+              borderRadius: 12, padding: 16, 
+              border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 4, background: cat.color }} />
+                <div style={{ fontWeight: 600 }}>{cat.name}</div>
               </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap:'wrap' }}>
+                <button className="btn btn-sm" onClick={() => handleEdit(cat)}>수정</button>
+                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(cat.id)}>삭제</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </LiquidPanel>
 
-              {children.map((child) => (
-                <div key={child.id} className="tx-row category-child-row">
-                  <div className="tx-main tx-col-label">
-                    <span className="tx-dot" style={{ background: child.color }} />
-                    <div className="tx-main-text">
-                      <div className="tx-name">{child.name}</div>
-                    </div>
-                  </div>
-                  <div className="tx-col-child">{parent.name}</div>
-                  <div className="tx-col-type">소분류</div>
-                  <div className="tx-col-actions">
-                    <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
-                  </div>
-                </div>
+      <LiquidPanel>
+        <div className="panel-header">
+          <div className="panel-title">지출 카테고리</div>
+        </div>
+        <div style={{overflowX: 'auto'}}>
+          <table className="glass-table">
+            <thead>
+              <tr>
+                <th>대분류</th>
+                <th>소분류</th>
+                <th className="text-center">구분</th>
+                <th className="text-center">작업</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenseTree.grouped.map(({ parent, children }) => (
+                <React.Fragment key={parent.id}>
+                  <tr style={{background: 'rgba(255,255,255,0.02)'}}>
+                    <td>
+                      <div style={{display:'flex', alignItems:'center', gap:8}}>
+                        <span style={{width:8, height:8, borderRadius:'50%', background: parent.color}} />
+                        <span style={{fontWeight:600}}>{parent.name}</span>
+                      </div>
+                    </td>
+                    <td className="text-muted">-</td>
+                    <td className="text-center">대분류</td>
+                    <td className="text-center">
+                      <div style={{display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap'}}>
+                        <button className="btn btn-sm" onClick={() => handleEdit(parent)}>수정</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>삭제</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {children.map((child) => (
+                    <tr key={child.id}>
+                      <td style={{paddingLeft: 40, color: 'var(--text-muted)'}}>↳</td>
+                      <td>
+                        <div style={{display:'flex', alignItems:'center', gap:8}}>
+                          <span style={{width:6, height:6, borderRadius:'50%', background: child.color}} />
+                          <span>{child.name}</span>
+                        </div>
+                      </td>
+                      <td className="text-center text-muted">소분류</td>
+                      <td className="text-center">
+                        <div style={{display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap'}}>
+                          <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               ))}
-            </React.Fragment>
-          ))}
-
-          {expenseTree.orphans.map((child) => (
-            <div key={child.id} className="tx-row category-child-row">
-              <div className="tx-main tx-col-label">
-                <span className="tx-dot" style={{ background: child.color }} />
-                <div className="tx-main-text">
-                  <div className="tx-name">{child.name}</div>
-                </div>
-              </div>
-              <div className="tx-col-child">미분류</div>
-              <div className="tx-col-type">소분류</div>
-              <div className="tx-col-actions">
-                <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
-                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
-              </div>
-            </div>
-          ))}
-
-          {expenseCategories.length === 0 && (
-            <div className="tx-row" style={{ justifyContent: 'center' }}>
-              <div className="tx-main" style={{ justifyContent: 'center' }}>
-                <div className="tx-name" style={{ color: 'var(--text-tertiary)' }}>
-                  지출 카테고리가 없습니다. 상단 버튼으로 추가하세요.
-                </div>
-              </div>
-            </div>
-          )}
+              {expenseTree.orphans.map((child) => (
+                <tr key={child.id}>
+                  <td className="text-muted">미분류</td>
+                  <td>
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      <span style={{width:6, height:6, borderRadius:'50%', background: child.color}} />
+                      <span>{child.name}</span>
+                    </div>
+                  </td>
+                  <td className="text-center text-muted">소분류</td>
+                  <td className="text-center">
+                    <div style={{display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap'}}>
+                      <button className="btn btn-sm" onClick={() => handleEdit(child)}>수정</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </LiquidPanel>
 
       {showForm && (
         <CategoryFormModal
@@ -159,48 +175,6 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
     </>
   );
 };
-
-// Category List Component
-const CategoryList: React.FC<{ 
-  items: Category[]; 
-  title: string; 
-  onEdit: (cat: Category) => void;
-  onDelete: (id: string) => void;
-}> = ({ items, title, onEdit, onDelete }) => (
-  <div className="panel-main" style={{ marginBottom: 20 }}>
-    <div className="panel-header">
-      <div className="panel-title">{title}</div>
-    </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-      {items.map((cat) => (
-        <div key={cat.id} className="card" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ 
-              width: 12, height: 12, borderRadius: 4, 
-              background: cat.color 
-            }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{cat.name}</div>
-              {cat.parent_id && (
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                  소분류
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-sm" onClick={() => onEdit(cat)} style={{ flex: 1 }}>
-              수정
-            </button>
-            <button className="btn btn-sm btn-danger" onClick={() => onDelete(cat.id)} style={{ flex: 1 }}>
-              삭제
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 // Category Form Modal
 const CategoryFormModal: React.FC<{
