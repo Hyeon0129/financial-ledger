@@ -192,14 +192,14 @@ body {
 }
 
 [data-theme="dark"] .bg::before {
-  background: url("/src/assets/bak1.png") center/cover no-repeat;
+  background: url("/src/assets/back.png") center/cover no-repeat;
   filter: brightness(.62) contrast(1.05) saturate(.92) blur(var(--bg-blur));
 }
 
 
 
 /* =========================
-   LIQUID GLASS COMPONENT
+   LIQUID GLASS COMPONENTㅇ
    ========================= */
 .glass {
   position: relative;

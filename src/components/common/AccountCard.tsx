@@ -39,7 +39,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, index, curren
       </div>
 
       <div className="account-card-balanceBlock">
-        <div className="account-card-balanceLabel">Current Balance</div>
+        <div className="account-card-balanceLabel">남은 금액</div>
         <div className="account-card-balance">{formatCurrency(account.balance, currency)}</div>
         {monthlySpend !== undefined && (
           <div className="account-card-monthlySpend">

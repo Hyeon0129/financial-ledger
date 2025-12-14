@@ -54,47 +54,18 @@
   overflow: hidden;
   z-index: -1;
   pointer-events: none;
+  background: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
-.auth-page .bg::before {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--overscan));
-  right: calc(-1 * var(--overscan));
-  bottom: calc(-1 * var(--overscan));
-  left: calc(-1 * var(--overscan));
-  background:
-  radial-gradient(circle at 50% 50%, rgba(210,210,220,.16), transparent 45%),
-  radial-gradient(circle at 50% 50%, rgba(180,160,200,.12), transparent 65%),
-  radial-gradient(ellipse at 5% 30%, rgba(120,120,140,.14), transparent 60%),
-  radial-gradient(ellipse at 10% 70%, rgba(160,140,180,.11), transparent 50%),
-  radial-gradient(ellipse at top, rgba(140,140,160,.20), transparent 75%),
-  radial-gradient(ellipse at bottom left, rgba(170,70,95,.16), transparent 75%),
-  radial-gradient(ellipse at bottom right, rgba(210,150,60,.14), transparent 75%),
-  radial-gradient(ellipse at center right, rgba(70,170,150,.10), transparent 75%),
-  radial-gradient(ellipse at 20% 80%, rgba(150,120,170,.10), transparent 55%),
-  radial-gradient(ellipse at 80% 20%, rgba(200,200,210,.10), transparent 55%),
-  linear-gradient(135deg, #07080B, #0C0F14);
-  filter: brightness(0.9) contrast(1.1) saturate(1) blur(var(--bg-blur));
+body[data-theme='dark'] .auth-page .bg {
+  background-image: url('../assets/bak1.png');
 }
 
-body[data-theme='light'] .auth-page .bg::before {
-  background: url('https://persistent.oaistatic.com/burrito-nux/1920.webp') center/cover no-repeat;
-  filter: brightness(.62) contrast(1.05) saturate(.92) blur(var(--bg-blur));
-}
-
-.auth-page .bg::after {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--overscan));
-  right: calc(-1 * var(--overscan));
-  bottom: calc(-1 * var(--overscan));
-  left: calc(-1 * var(--overscan));
-  background:
-    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 42%, rgba(0,0,0,.16) 56%, rgba(0,0,0,.34) 76%, rgba(0,0,0,.52) 100%),
-    radial-gradient(160% 115% at 40% 118%, rgba(0,0,0,.58) 52%, transparent 90%),
-    linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,.25) 40%, rgba(0,0,0,.45) 80%);
-  filter: blur(calc(var(--bg-blur) * .35));
+body[data-theme='light'] .auth-page .bg {
+  background-image: url('https://persistent.oaistatic.com/burrito-nux/1920.webp');
 }
 
 .auth-page .auth-container {

@@ -120,21 +120,21 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
 /* ========== Account Cards ========== */
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 360px));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
   gap: 16px;
   justify-content: start;
   align-content: start;
 }
 @media (max-width: 1200px) {
-  .account-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 340px)); }
+  .account-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 300px)); }
 }
 @media (max-width: 760px) {
   .account-grid { grid-template-columns: 1fr; }
 }
 
 .account-card-glass {
-  aspect-ratio: 1.7 / 1;
-  min-height: 240px;
+  aspect-ratio: 1.55 / 1;
+  min-height: 210px;
   width: 100%;
 }
 
