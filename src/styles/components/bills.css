@@ -1,0 +1,119 @@
+/* ========== Bills & Payments ========== */
+.bills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 360px));
+  gap: 16px;
+  align-content: start;
+}
+
+@media (max-width: 760px) {
+  .bills-grid { grid-template-columns: 1fr; }
+}
+
+.bill-card .glass-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bill-card-top {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.bill-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 850;
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.bill-card-meta { min-width: 0; }
+
+.bill-card-name {
+  font-size: 13px;
+  font-weight: 750;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bill-card-date {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.bill-card-status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(255, 255, 255, 0.86);
+  white-space: nowrap;
+}
+
+.bill-card-status.scheduled {
+  background: rgba(245, 124, 0, 0.12);
+  border-color: rgba(245, 124, 0, 0.20);
+  color: rgba(255, 214, 170, 0.98);
+}
+.bill-card-status.paid {
+  background: rgba(0, 230, 118, 0.12);
+  border-color: rgba(0, 230, 118, 0.20);
+  color: rgba(185, 255, 225, 0.98);
+}
+.bill-card-status.overdue {
+  background: rgba(255, 23, 68, 0.12);
+  border-color: rgba(255, 23, 68, 0.20);
+  color: rgba(255, 200, 214, 0.98);
+}
+
+.bill-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bill-card-amount {
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.bill-card-delete {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 12px;
+}
+
+/* Form layout (2 columns) */
+.bills-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.bills-form-span2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .bills-form-grid { grid-template-columns: 1fr; }
+  .bills-form-span2 { grid-column: auto; }
+}
+

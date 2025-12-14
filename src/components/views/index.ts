@@ -6,4 +6,5 @@ export * from './BudgetsView';
 export * from './CategoriesView';
 export * from './AccountsView';
 export * from './ReportsView';
+export * from './BillsView';
 export * from './SavingsView';

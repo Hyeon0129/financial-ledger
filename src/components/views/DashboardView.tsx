@@ -14,8 +14,9 @@ import {
 import type { Account, Budget, Category, MonthlyStats, SavingsGoal, Transaction } from '../../api';
 import { formatCurrency, formatDateShort } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
-import { AccountCard } from '../common/AccountCard';
 import type { View } from '../common/utils';
+import type { BillItem } from './BillsView';
+import { getBills } from './BillsView';
 
 interface DashboardViewProps {
   stats: MonthlyStats | null;
@@ -25,6 +26,7 @@ interface DashboardViewProps {
   savingsGoals: SavingsGoal[];
   categories: Category[];
   accounts: Account[];
+  yearlyStats?: { year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> } | null;
   currency: string;
   month: string;
   onNavigate: (v: View) => void;
@@ -44,7 +46,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
   accounts,
   budgets,
-  savingsGoals,
+  savingsGoals: _savingsGoals,
+  yearlyStats,
   currency,
   month,
   onNavigate,
@@ -61,23 +64,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
   const budgetProgress = totalBudget > 0 ? (expense / totalBudget) * 100 : 0;
   const budgetRemaining = Math.max(0, totalBudget - expense);
-  const prevBudgetProgress = totalBudget > 0 ? ((prevStats?.expense ?? 0) / totalBudget) * 100 : 0;
-  const budgetProgressDelta = getDelta(budgetProgress, prevBudgetProgress);
 
   const totalAssets = useMemo(() => accounts.reduce((sum, acc) => sum + (acc.balance ?? 0), 0), [accounts]);
-
-  const monthlySpendByAccount = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions
-      .filter((t) => t.type === 'expense' && t.date.startsWith(month))
-      .forEach((t) => {
-        if (!t.account_id) return;
-        map[t.account_id] = (map[t.account_id] ?? 0) + t.amount;
-      });
-    return map;
-  }, [transactions, month]);
-
-  const recentExpenseTx = useMemo(() => transactions.filter((t) => t.type === 'expense').slice(0, 5), [transactions]);
 
   const categoryData = useMemo(() => {
     if (!stats?.byCategory) return [];
@@ -95,8 +83,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const largestCategoryPct = categoryData[0]?.pct ?? 0;
 
-  const [range, setRange] = useState<'24H' | '7D' | '30D' | 'YTD'>('7D');
-  const rangeDays = range === '24H' ? 1 : range === '7D' ? 7 : range === '30D' ? 30 : 365;
+  const [range, setRange] = useState<'7D' | '30D' | 'YTD'>('7D');
 
   const dailyTotals = useMemo(() => {
     if (!stats) return new Map<string, { income: number; expense: number }>();
@@ -110,29 +97,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return map;
   }, [stats]);
 
-  const assetTrendData = useMemo(() => {
-    if (!stats) return [];
+  const expenseChartData = useMemo(() => {
+    if (!stats) return [] as Array<{ name: string; value: number }>;
+
     const [yy, mm] = month.split('-').map(Number);
     const daysInMonth = new Date(yy, mm, 0).getDate();
+
+    const getISO = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    if (range === 'YTD') {
+      const map = new Map<string, number>();
+      for (const row of yearlyStats?.monthlyTrend ?? []) {
+        if (row.type !== 'expense') continue;
+        map.set(row.month, row.total);
+      }
+
+      return Array.from({ length: 12 }).map((_, i) => {
+        const key = `${yy}-${String(i + 1).padStart(2, '0')}`;
+        const val = map.get(key) ?? 0;
+        const name = new Date(yy, i, 1).toLocaleDateString('en-US', { month: 'short' });
+        return { name, value: val };
+      });
+    }
+
+    if (range === '30D') {
+      return Array.from({ length: daysInMonth }).map((_, idx) => {
+        const day = idx + 1;
+        const dateStr = `${month}-${String(day).padStart(2, '0')}`;
+        const totals = dailyTotals.get(dateStr) ?? { income: 0, expense: 0 };
+        return { name: String(day), value: totals.expense };
+      });
+    }
+
+    // 7D (Mon..Sun)
+    const end = new Date(yy, mm - 1, daysInMonth);
     const now = new Date();
     const isCurrentMonth = now.getFullYear() === yy && now.getMonth() + 1 === mm;
-    const endDay = isCurrentMonth ? Math.min(now.getDate(), daysInMonth) : daysInMonth;
-    const startDay = Math.max(1, endDay - rangeDays + 1);
+    const endDate = isCurrentMonth ? new Date(yy, mm - 1, Math.min(now.getDate(), daysInMonth)) : end;
 
-    let cumulative = 0;
-    const out: Array<{ name: string; value: number }> = [];
-    for (let day = startDay; day <= endDay; day++) {
-      const dateStr = `${month}-${String(day).padStart(2, '0')}`;
-      const totals = dailyTotals.get(dateStr) ?? { income: 0, expense: 0 };
-      cumulative += totals.income - totals.expense;
-      const label =
-        rangeDays <= 7
-          ? new Date(yy, mm - 1, day).toLocaleDateString('en-US', { weekday: 'short' })
-          : String(day);
-      out.push({ name: label, value: cumulative });
-    }
-    return out;
-  }, [dailyTotals, month, rangeDays, stats]);
+    const dayOfWeek = endDate.getDay(); // 0 Sun ... 6 Sat
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const monday = new Date(endDate);
+    monday.setDate(endDate.getDate() - diffToMonday);
+
+    return Array.from({ length: 7 }).map((_, idx) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + idx);
+      const iso = getISO(d);
+      const totals = dailyTotals.get(iso) ?? { income: 0, expense: 0 };
+      const name = d.toLocaleDateString('en-US', { weekday: 'short' });
+      return { name, value: totals.expense };
+    });
+  }, [dailyTotals, month, range, stats, yearlyStats?.monthlyTrend]);
 
   const TrendPill: React.FC<{ dir: TrendDir; pct: number }> = ({ dir, pct }) => (
     <span className={`trend ${dir}`}>
@@ -142,26 +159,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </span>
   );
 
-  const renderRangeBar = (progressPct: number) => {
-    const segments = 52;
-    const filled = Math.min(segments, Math.round((progressPct / 100) * segments));
+  const renderSpeedometer = (progressPct: number) => {
+    const clamp = (n: number) => Math.max(0, Math.min(100, n));
+    const pct = clamp(progressPct);
+    const ticks = 32;
+    const filled = Math.round((pct / 100) * ticks);
+    const centerX = 130;
+    const centerY = 140;
+    const rOuter = 96;
+    const rInner = 82;
+    const needleR = 74;
+    const angleForTick = (i: number) => Math.PI - (Math.PI * i) / (ticks - 1); // pi..0
+
+    const needleAngle = Math.PI - (Math.PI * pct) / 100;
+    const needleX = centerX + Math.cos(needleAngle) * needleR;
+    const needleY = centerY - Math.sin(needleAngle) * needleR;
+
     return (
-      <div className="limit-range">
-        <div className="limit-range-label">52 week range</div>
-        <div className="limit-range-bar" aria-hidden="true">
-          {Array.from({ length: segments }).map((_, i) => {
+      <div className="dash-speedoWrap" aria-label={`Monthly limit ${pct.toFixed(0)}%`}>
+        <svg className="dash-speedo" viewBox="0 0 260 170" role="img" aria-hidden="true">
+          <path
+            d="M34,140 A96,96 0 0 1 226,140"
+            fill="none"
+            stroke="rgba(255,255,255,0.10)"
+            strokeWidth="14"
+            strokeLinecap="round"
+          />
+
+          {Array.from({ length: ticks }).map((_, i) => {
+            const a = angleForTick(i);
+            const x1 = centerX + Math.cos(a) * rInner;
+            const y1 = centerY - Math.sin(a) * rInner;
+            const x2 = centerX + Math.cos(a) * rOuter;
+            const y2 = centerY - Math.sin(a) * rOuter;
             const isActive = i < filled;
-            const hue = 10 + (110 * i) / (segments - 1); // red -> green
-            const activeColor = `hsl(${hue} 90% 55%)`;
+            const hue = 120 - (120 * i) / (ticks - 1);
+            const stroke = isActive ? `hsl(${hue} 90% 55%)` : 'rgba(255,255,255,0.16)';
+            const strokeWidth = i % 4 === 0 ? 3 : 2;
             return (
-              <span
+              <line
                 key={i}
-                className={`limit-tick ${isActive ? 'active' : ''}`}
-                style={isActive ? { background: activeColor } : undefined}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
               />
             );
           })}
-        </div>
+
+          <line
+            x1={centerX}
+            y1={centerY}
+            x2={needleX}
+            y2={needleY}
+            stroke="rgba(255,255,255,0.85)"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          <circle cx={centerX} cy={centerY} r="6" fill="rgba(255,255,255,0.85)" />
+        </svg>
       </div>
     );
   };
@@ -178,27 +237,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="dash-kpiValue">{value}</div>
       <div className="dash-kpiSub">
         {typeof trendPct === 'number' && trendDir ? <TrendPill dir={trendDir} pct={trendPct} /> : <span />}
-        <span className="dash-kpiSubText">from last month</span>
+        <span className="dash-kpiSubText">vs last month</span>
       </div>
       {children}
     </LiquidPanel>
   );
 
+  const recentExpensesAll = useMemo(
+    () => transactions.filter((t) => t.type === 'expense' && t.date.startsWith(month)).slice(0, 120),
+    [transactions, month],
+  );
+  const [recentPage, setRecentPage] = useState(1);
+  const recentPageSize = 10;
+  const recentTotalPages = Math.max(1, Math.ceil(recentExpensesAll.length / recentPageSize));
+  const recentPageSafe = Math.min(recentTotalPages, Math.max(1, recentPage));
+  const recentPageItems = recentExpensesAll.slice(
+    (recentPageSafe - 1) * recentPageSize,
+    recentPageSafe * recentPageSize,
+  );
+
+  const bills = getBills().slice(0, 1);
+  const netChange = income - expense;
+  const prevNetChange = (prevStats?.income ?? 0) - (prevStats?.expense ?? 0);
+  const netChangeDelta = getDelta(netChange, prevNetChange);
+
   if (!stats) return <div className="loading-spinner" />;
 
   return (
     <div className="dashboard-layout">
-      <LiquidPanel className="interactive dash-mainPanel">
-        <div className="dash-mainHeader">
-          <div className="dash-mainTitleBlock">
-            <div className="dash-mainTitle">Total Asset Value</div>
-            <div className="dash-mainValueRow">
-              <div className="dash-mainValue">{formatCurrency(totalAssets, currency)}</div>
-              <TrendPill dir={balanceDelta.pct >= 0 ? 'up' : 'down'} pct={balanceDelta.pct} />
-            </div>
-          </div>
+      <LiquidPanel className="interactive dash-chartPanel">
+        <div className="dash-chartHeader">
+          <div className="dash-chartTitle">Expense Trend</div>
           <div className="dash-rangeTabs" role="tablist" aria-label="Range">
-            {(['24H', '7D', '30D', 'YTD'] as const).map((k) => (
+            {(['7D', '30D', 'YTD'] as const).map((k) => (
               <button
                 key={k}
                 type="button"
@@ -215,74 +286,165 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="dash-chartWrap">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={assetTrendData} margin={{ top: 12, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart data={expenseChartData} margin={{ top: 18, right: 18, left: 10, bottom: 8 }}>
               <defs>
-                <linearGradient id="assetArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="rgba(178, 109, 255, 0.35)" />
-                  <stop offset="95%" stopColor="rgba(178, 109, 255, 0.00)" />
+                <linearGradient id="expenseArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="rgba(0, 230, 118, 0.22)" />
+                  <stop offset="95%" stopColor="rgba(0, 230, 118, 0.00)" />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
+              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 10" />
               <XAxis
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
+                minTickGap={8}
+                interval={range === '30D' ? 'preserveStartEnd' : 0}
+                padding={{ left: 14, right: 14 }}
+                tickMargin={10}
                 tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 11 }}
               />
               <YAxis hide />
               <Tooltip
                 cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeWidth: 1 }}
                 contentStyle={{
-                  backgroundColor: 'rgba(10, 12, 16, 0.92)',
-                  borderColor: 'rgba(255,255,255,0.12)',
+                  background: 'rgba(10, 12, 16, 0.92)',
+                  border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: 14,
                   boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
-                  color: '#fff',
+                  color: 'rgba(255,255,255,0.92)',
                 }}
-                formatter={(val: number) => formatCurrency(val, currency)}
+                labelStyle={{
+                  color: 'rgba(255,255,255,0.78)',
+                  fontWeight: 750,
+                  marginBottom: 6,
+                }}
+                itemStyle={{
+                  color: 'rgba(255,255,255,0.92)',
+                  fontWeight: 750,
+                }}
+                formatter={(val: unknown) => formatCurrency(Number(val) || 0, currency)}
               />
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="rgba(205, 130, 255, 0.95)"
+                stroke="rgba(0, 230, 118, 0.90)"
                 strokeWidth={3}
-                fill="url(#assetArea)"
+                fill="url(#expenseArea)"
+                dot={false}
+                activeDot={{
+                  r: 5,
+                  fill: 'rgba(12, 12, 14, 0.95)',
+                  stroke: 'rgba(0, 230, 118, 0.92)',
+                  strokeWidth: 3,
+                }}
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
+      </LiquidPanel>
 
-        <div className="dash-divider" />
+      <div className="dash-kpiGrid">
+        <SmallKpiCard
+          title="Total Asset"
+          value={formatCurrency(totalAssets, currency)}
+          trendDir={balanceDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={balanceDelta.pct}
+        />
+        <SmallKpiCard
+          title="Total Revenue"
+          value={formatCurrency(income, currency)}
+          trendDir={incomeDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={incomeDelta.pct}
+        />
+        <SmallKpiCard
+          title="Total Expense"
+          value={formatCurrency(expense, currency)}
+          trendDir={expenseDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={expenseDelta.pct}
+        />
+        <SmallKpiCard
+          title="Net Change"
+          value={formatCurrency(netChange, currency)}
+          trendDir={netChangeDelta.pct >= 0 ? 'up' : 'down'}
+          trendPct={netChangeDelta.pct}
+        />
+        <SmallKpiCard title="Budget Left" value={formatCurrency(budgetRemaining, currency)} trendDir="up" trendPct={0} />
+        <SmallKpiCard title="Transactions" value={txCount} trendDir="up" trendPct={0} />
+      </div>
 
-        <div className="dash-bottomGrid">
-          <div className="dash-recentBox">
-            <div className="dash-subHeader">
-              <div className="dash-subTitle">Recent Spending</div>
-              <button className="dash-linkBtn" type="button" onClick={() => onNavigate('transactions')}>
-                View details
-              </button>
+      <LiquidPanel className="interactive dash-limitPanel">
+        <div className="dash-subHeader">
+          <div className="dash-subTitle">Monthly Limit</div>
+          <div className="dash-limitHeaderRight">
+            <div className="dash-limitLabel">Budget Left</div>
+            <div className="dash-limitValue">{formatCurrency(budgetRemaining, currency)}</div>
+          </div>
+        </div>
+        <div className="dash-limitBody">
+          <div className="dash-limitGauge">{renderSpeedometer(budgetProgress)}</div>
+          <div className="dash-limitPct">{Math.round(Math.max(0, Math.min(100, budgetProgress)))}%</div>
+        </div>
+      </LiquidPanel>
+
+      <LiquidPanel className="interactive dash-activityPanel">
+        <div className="dash-subHeader">
+          <div className="dash-subTitle">Recent Spending</div>
+          <button className="dash-linkBtn" type="button" onClick={() => onNavigate('transactions')}>
+            View details
+          </button>
+        </div>
+        <div className="dash-activityGrid">
+          <div className="dash-recentTableWrap">
+            <div className="dash-recentHead">
+              <div className="dash-recentColDate">날짜</div>
+              <div className="dash-recentColCat">카테고리</div>
+              <div className="dash-recentColAmt">금액</div>
+              <div className="dash-recentColAcc">계좌</div>
+              <div className="dash-recentColMemo">메모</div>
             </div>
-            <div className="dash-miniTable">
-              {recentExpenseTx.map((t) => (
-                <div key={t.id} className="dash-miniRow">
-                  <div className="dash-miniLeft">
-                    <div className="dash-miniIcon">{t.category_name?.[0] ?? '?'}</div>
-                    <div className="dash-miniMeta">
-                      <div className="dash-miniName">{t.category_name || 'Uncategorized'}</div>
-                      <div className="dash-miniDate">{formatDateShort(t.date)}</div>
-                    </div>
+            <div className="dash-recentBody">
+              {recentPageItems.map((t) => (
+                <div key={t.id} className="dash-recentRow">
+                  <div className="dash-recentColDate">{formatDateShort(t.date)}</div>
+                  <div className="dash-recentColCat">
+                    <span className="dash-recentDot" style={{ background: t.category_color || 'rgba(255,255,255,0.18)' }} />
+                    <span className="dash-recentCatName">{t.category_name || 'Uncategorized'}</span>
                   </div>
-                  <div className="dash-miniRight">
-                    <div className="dash-miniAmount">{formatCurrency(t.amount, currency)}</div>
-                  </div>
+                  <div className="dash-recentColAmt">{formatCurrency(t.amount, currency)}</div>
+                  <div className="dash-recentColAcc">{t.account_name || '-'}</div>
+                  <div className="dash-recentColMemo">{t.memo || '-'}</div>
                 </div>
               ))}
-              {recentExpenseTx.length === 0 && <div className="dash-empty">No expenses</div>}
+              {recentExpensesAll.length === 0 && <div className="dash-empty">No expenses</div>}
+            </div>
+            <div className="dash-recentPager" aria-label="Recent spending pagination">
+              <button
+                className="dash-pagerBtn"
+                type="button"
+                onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                disabled={recentPageSafe <= 1}
+                aria-label="Previous"
+              >
+                ‹
+              </button>
+              <span className="dash-pagerText">
+                {recentPageSafe}/{recentTotalPages}
+              </span>
+              <button
+                className="dash-pagerBtn"
+                type="button"
+                onClick={() => setRecentPage((p) => Math.min(recentTotalPages, p + 1))}
+                disabled={recentPageSafe >= recentTotalPages}
+                aria-label="Next"
+              >
+                ›
+              </button>
             </div>
           </div>
 
           <div className="dash-donutBox">
-            <div className="dash-subHeader">
+            <div className="dash-subHeader" style={{ marginBottom: 10 }}>
               <div className="dash-subTitle">By Category</div>
               <div className="dash-subHint">expenses</div>
             </div>
@@ -294,10 +456,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       data={categoryData}
                       dataKey="value"
                       nameKey="name"
-                      innerRadius="68%"
-                      outerRadius="88%"
+                      innerRadius="70%"
+                      outerRadius="92%"
                       paddingAngle={3}
-                      stroke="rgba(0,0,0,0)"
+                      stroke="rgba(255,255,255,0.10)"
+                      strokeWidth={1}
                     >
                       {categoryData.map((entry, idx) => (
                         <Cell key={idx} fill={entry.color} />
@@ -325,97 +488,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </LiquidPanel>
 
-      <div className="dash-kpiGrid">
-        <SmallKpiCard
-          title="Total Revenue"
-          value={formatCurrency(income, currency)}
-          trendDir={incomeDelta.pct >= 0 ? 'up' : 'down'}
-          trendPct={incomeDelta.pct}
-        />
-        <SmallKpiCard
-          title="Total Expense"
-          value={formatCurrency(expense, currency)}
-          trendDir={expenseDelta.pct <= 0 ? 'up' : 'down'}
-          trendPct={expenseDelta.pct}
-        />
-        <SmallKpiCard
-          title="Net Growth"
-          value={formatCurrency(balance, currency)}
-          trendDir={balanceDelta.pct >= 0 ? 'up' : 'down'}
-          trendPct={balanceDelta.pct}
-        />
-        <SmallKpiCard title="Transactions" value={txCount} trendDir="up" trendPct={0} />
-        <SmallKpiCard
-          title="Budget Left"
-          value={formatCurrency(budgetRemaining, currency)}
-          trendDir={expenseDelta.pct <= 0 ? 'up' : 'down'}
-          trendPct={expenseDelta.pct}
-        />
-        <SmallKpiCard
-          title="Monthly Limit"
-          value={`${Math.round(budgetProgress)}%`}
-          trendDir={budgetProgressDelta.pct <= 0 ? 'up' : 'down'}
-          trendPct={budgetProgressDelta.pct}
-        >
-          <div className="dash-kpiExtra">{renderRangeBar(budgetProgress)}</div>
-        </SmallKpiCard>
-      </div>
-
-      <LiquidPanel className="interactive dash-cardsPanel">
-        <div className="dash-subHeader">
-          <div className="dash-subTitle">My Cards</div>
-          <button className="dash-linkBtn" type="button" onClick={() => onNavigate('accounts')}>
-            Manage
+      <LiquidPanel className="interactive dash-billsPanel">
+        <div className="dash-billsHeader">
+          <div className="dash-subTitle">Bill &amp; Payment</div>
+          <button className="dash-billAdd" type="button" onClick={() => onNavigate('bills')}>
+            <i className="ph ph-plus" />
           </button>
         </div>
-        {accounts.length > 0 ? (
-          <div className="accounts-grid">
-            {accounts.map((acc, idx) => (
-              <AccountCard
-                key={acc.id}
-                account={acc}
-                index={idx}
-                currency={currency}
-                monthlySpend={monthlySpendByAccount[acc.id] ?? 0}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="dash-empty">No accounts added.</div>
-        )}
-      </LiquidPanel>
 
-      <LiquidPanel className="interactive dash-goalsPanel">
-        <div className="dash-subHeader">
-          <div className="dash-subTitle">Saving Goals</div>
-          <button className="dash-linkBtn" type="button" onClick={() => onNavigate('savings')}>
-            View
-          </button>
-        </div>
-        <div className="dash-goalsList">
-          {savingsGoals.slice(0, 3).map((g) => {
-            const progress = g.target_amount > 0 ? Math.min(100, (g.current_amount / g.target_amount) * 100) : 0;
-            return (
-              <div key={g.id} className="dash-goalRow">
-                <div className="dash-goalTop">
-                  <div className="dash-goalName">{g.name}</div>
-                  <div className="dash-goalPct">{progress.toFixed(0)}%</div>
+        <div className="dash-billsBody">
+          {bills.map((b: BillItem) => (
+            <div key={b.id} className="dash-billCard">
+              <div className="dash-billTop">
+                <div className="dash-billIcon">{b.name[0] ?? 'B'}</div>
+                <div className="dash-billMeta">
+                  <div className="dash-billName">{b.name}</div>
+                  <div className="dash-billDate">{formatDateShort(b.dueDate)}</div>
                 </div>
-                <div className="dash-goalAmounts">
-                  <span>{formatCurrency(g.current_amount, currency)}</span>
-                  <span className="dash-goalSep">/</span>
-                  <span className="dash-goalTarget">{formatCurrency(g.target_amount, currency)}</span>
-                </div>
-                <div className="dash-goalTrack">
-                  <div className="dash-goalFill" style={{ width: `${progress}%`, background: g.color || 'var(--accent-purple)' }} />
-                </div>
+                <div className={`dash-billStatus ${b.status}`}>{b.statusLabel}</div>
               </div>
-            );
-          })}
-          {savingsGoals.length === 0 && <div className="dash-empty">No goals</div>}
+              <div className="dash-billAmount">{formatCurrency(b.amount, currency)}</div>
+            </div>
+          ))}
+          {bills.length === 0 && <div className="dash-empty">No bills</div>}
         </div>
+
+        <button className="dash-billsViewAll" type="button" onClick={() => onNavigate('bills')}>
+          View All
+        </button>
       </LiquidPanel>
     </div>
   );
 };
-

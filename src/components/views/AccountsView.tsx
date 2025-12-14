@@ -64,64 +64,66 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
       </div>
 
       <LiquidPanel>
-        <div style={{overflowX: 'auto'}}>
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>대출명</th>
-                <th className="text-right">남은 원금</th>
-                <th className="text-right">월 상환액</th>
-                <th className="text-center">금리</th>
-                <th className="text-center">진행률</th>
-                <th className="text-center">다음 납부</th>
-                <th className="text-center">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loans.map((loan) => {
-                const paidAmount = Math.max(0, loan.principal - (loan.remaining_principal ?? 0));
-                const progress = loan.principal > 0 ? Math.min(100, (paidAmount / loan.principal) * 100) : 0;
-                return (
-                  <tr key={loan.id}>
-                    <td>
-                      <div style={{fontWeight: 600}}>{loan.name}</div>
-                      <div style={{fontSize: 12, color: 'var(--text-muted)'}}>
-                        {loan.account_name || '계좌 없음'}
+        <div style={{ overflowX: 'auto' }}>
+          <div className="loan-table">
+            <div className="loan-head">
+              <div className="loan-col-name">대출명</div>
+              <div className="loan-col-num">남은 원금</div>
+              <div className="loan-col-num">월 상환액</div>
+              <div className="loan-col-rate">금리</div>
+              <div className="loan-col-progress">진행률</div>
+              <div className="loan-col-due">다음 납부</div>
+              <div className="loan-col-actions">관리</div>
+            </div>
+
+            {loans.map((loan) => {
+              const paidAmount = Math.max(0, loan.principal - (loan.remaining_principal ?? 0));
+              const progress = loan.principal > 0 ? Math.min(100, (paidAmount / loan.principal) * 100) : 0;
+              return (
+                <div key={loan.id} className="loan-row">
+                  <div className="loan-col-name">
+                    <div className="loan-name">{loan.name}</div>
+                    <div className="loan-sub">{loan.account_name || '계좌 없음'}</div>
+                  </div>
+                  <div className="loan-col-num loan-strong">{formatCurrency(Math.round(loan.remaining_principal), currency)}</div>
+                  <div className="loan-col-num loan-danger">{formatCurrency(loan.monthly_payment, currency)}</div>
+                  <div className="loan-col-rate">{loan.interest_rate}%</div>
+                  <div className="loan-col-progress">
+                    <div className="loan-progress">
+                      <div className="loan-progressTrack">
+                        <div className="loan-progressFill" style={{ width: `${progress}%` }} />
                       </div>
-                    </td>
-                    <td className="text-right font-bold">{formatCurrency(Math.round(loan.remaining_principal), currency)}</td>
-                    <td className="text-right text-danger">{formatCurrency(loan.monthly_payment, currency)}</td>
-                    <td className="text-center">{loan.interest_rate}%</td>
-                    <td className="text-center">
-                      <div style={{display:'flex', alignItems:'center', gap:12, justifyContent:'center'}}>
-                        <div style={{width: 60, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow:'hidden'}}>
-                          <div style={{width: `${progress}%`, height: '100%', background: 'var(--accent-blue)', borderRadius: 3}} />
-                        </div>
-                        <span style={{fontSize: 11}}>{progress.toFixed(0)}%</span>
-                      </div>
-                    </td>
-                    <td className="text-center">{loan.next_due_date ? formatDate(loan.next_due_date) : '완납'}</td>
-                    <td className="text-center">
-                      <div style={{display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap'}}>
-                        <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); setSettlingLoan(loan); setShowSettleForm(true); }}>상환</button>
-                        <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); setEditingLoan(loan); setShowLoanForm(true); }}>수정</button>
-                        <button className="btn btn-icon" style={{width:32, height:32}} onClick={(e) => { e.stopPropagation(); handleDeleteLoan(loan.id); }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {loans.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center" style={{padding: 40, color: 'var(--text-muted)'}}>
-                    등록된 대출이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      <span className="loan-progressPct">{progress.toFixed(0)}%</span>
+                    </div>
+                  </div>
+                  <div className="loan-col-due">{loan.next_due_date ? formatDate(loan.next_due_date) : '완납'}</div>
+                  <div className="loan-col-actions">
+                    <button
+                      className="btn btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSettlingLoan(loan);
+                        setShowSettleForm(true);
+                      }}
+                    >
+                      상환
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteLoan(loan.id);
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {loans.length === 0 && <div className="loan-empty">등록된 대출이 없습니다.</div>}
+          </div>
         </div>
       </LiquidPanel>
 

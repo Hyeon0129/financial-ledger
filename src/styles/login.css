@@ -46,27 +46,7 @@
   position: relative;
 }
 
-.auth-page .bg {
-  position: fixed;
-  inset: 0;
-  width: 100dvw;
-  height: 100dvh;
-  overflow: hidden;
-  z-index: -1;
-  pointer-events: none;
-  background: transparent;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-}
-
-body[data-theme='dark'] .auth-page .bg {
-  background-image: url('../assets/bak1.png');
-}
-
-body[data-theme='light'] .auth-page .bg {
-  background-image: url('https://persistent.oaistatic.com/burrito-nux/1920.webp');
-}
+/* Background is applied on body (global.css) */
 
 .auth-page .auth-container {
   position: relative;

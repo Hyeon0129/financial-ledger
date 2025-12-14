@@ -1,74 +1,133 @@
 /* =========================
-   DASHBOARD (renew.png)
+   DASHBOARD (renew + chart.png)
    ========================= */
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(620px, 2.2fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(640px, 2.2fr) minmax(360px, 1fr);
   grid-template-areas:
-    "main kpi"
-    "main kpi"
-    "cards goals";
+    "chart kpi"
+    "chart limit"
+    "activity bills";
+  grid-template-rows: auto auto 1fr;
   gap: 18px;
   align-items: stretch;
+  min-height: calc(100vh - 190px);
 }
 
-.dash-mainPanel { grid-area: main; }
+.dash-chartPanel { grid-area: chart; }
 .dash-kpiGrid { grid-area: kpi; }
-.dash-cardsPanel { grid-area: cards; }
-.dash-goalsPanel { grid-area: goals; }
+.dash-activityPanel { grid-area: activity; }
+.dash-limitPanel { grid-area: limit; }
+.dash-billsPanel { grid-area: bills; }
 
 @media (max-width: 1180px) {
   .dashboard-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "main"
+      "chart"
       "kpi"
-      "cards"
-      "goals";
+      "limit"
+      "activity"
+      "bills";
+    grid-template-rows: auto;
+    min-height: auto;
   }
 }
 
 /* =========================
-   MAIN PANEL (chart + table + donut)
+   CHART PANEL
    ========================= */
-.dash-mainPanel .glass-content {
-  padding: 18px 18px 18px;
-  height: 100%;
+.dash-chartPanel .glass-content {
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 560px;
+  gap: 14px;
+  min-height: 480px;
 }
 
-.dash-mainHeader {
+.dash-chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dash-chartTitle {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.dash-chartMeta {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
-.dash-mainTitle {
-  font-size: 14px;
+.dash-stat {
+  min-width: 0;
+}
+
+.dash-statLabel {
+  font-size: 12px;
   font-weight: 650;
-  letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(255, 255, 255, 0.64);
+  letter-spacing: 0.02em;
 }
 
-.dash-mainValueRow {
+.dash-statValue {
   margin-top: 6px;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.dash-mainValue {
-  font-size: 34px;
-  font-weight: 760;
-  letter-spacing: -0.03em;
-  color: rgba(255, 255, 255, 0.96);
+.dash-statSub {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
+
+.dash-statHint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+}
+
+.dash-chartLegend {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  user-select: none;
+}
+
+.dash-legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.dash-legendDot.earning { background: rgba(148, 163, 184, 0.65); }
+.dash-legendDot.expenditure { background: var(--accent-orange); }
 
 .dash-rangeTabs {
   display: inline-flex;
@@ -102,206 +161,55 @@
 }
 
 .dash-chartWrap {
-  height: 240px;
+  flex: 1;
+  min-height: 320px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.12);
-}
-
-.dash-divider {
-  height: 1px;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.10);
-}
-
-.dash-bottomGrid {
-  display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 16px;
-  align-items: stretch;
-  min-height: 240px;
-}
-
-@media (max-width: 1180px) {
-  .dash-bottomGrid { grid-template-columns: 1fr; }
-}
-
-.dash-subHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.dash-subTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  letter-spacing: -0.01em;
-}
-
-.dash-subHint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.60);
-}
-
-.dash-linkBtn {
-  border: 0;
-  background: transparent;
-  color: rgba(205, 130, 255, 0.92);
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 10px;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-.dash-linkBtn:hover {
-  background: rgba(205, 130, 255, 0.12);
-  color: rgba(235, 200, 255, 0.96);
-}
-
-.dash-miniTable {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dash-miniRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dash-miniLeft {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.dash-miniIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 750;
-}
-
-.dash-miniMeta { min-width: 0; }
-
-.dash-miniName {
-  font-size: 13px;
-  font-weight: 650;
-  color: rgba(255, 255, 255, 0.92);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dash-miniDate {
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.dash-miniAmount {
-  font-size: 13px;
-  font-weight: 750;
-  color: rgba(255, 255, 255, 0.92);
-  white-space: nowrap;
-}
-
-.dash-donutWrap {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dash-donutChart {
   position: relative;
-  width: 160px;
-  height: 160px;
-  flex: 0 0 auto;
 }
 
-.dash-donutCenter {
+.dash-chartWrap::before {
+  content: "";
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
+  background:
+    radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px);
+  background-size: 10px 10px;
+  opacity: 0.14;
 }
 
-.dash-donutPct {
-  font-size: 26px;
-  font-weight: 750;
-  color: rgba(255, 255, 255, 0.94);
-  letter-spacing: -0.02em;
+.dash-tooltip {
+  min-width: 220px;
+  background: rgba(10, 12, 16, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  padding: 12px;
 }
 
-.dash-donutLabel {
-  margin-top: 4px;
+.dash-tooltipTitle {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.dash-donutLegend {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-
-.dash-legendRow {
-  display: grid;
-  grid-template-columns: 10px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.dash-legendDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 4px;
-}
-
-.dash-legendName {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dash-legendPct {
+  font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
-  font-weight: 650;
+  margin-bottom: 8px;
 }
 
-@media (max-width: 520px) {
-  .dash-donutWrap { flex-direction: column; align-items: stretch; }
-  .dash-donutChart { margin: 0 auto; }
+.dash-tooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 6px 0;
 }
+
+.dash-tooltipKey { color: rgba(255, 255, 255, 0.68); font-size: 12px; }
+.dash-tooltipVal { color: rgba(255, 255, 255, 0.92); font-size: 12px; font-weight: 750; }
 
 /* =========================
-   KPI GRID (6 cards, 3 per row)
+   KPI GRID
    ========================= */
 .dash-kpiGrid {
   display: grid;
@@ -318,7 +226,7 @@
 }
 
 .dash-kpiCard .glass-content {
-  padding: 16px 16px;
+  padding: 16px;
   min-height: 124px;
 }
 
@@ -329,6 +237,9 @@
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.62);
 }
+
+
+
 
 .dash-kpiValue {
   margin-top: 10px;
@@ -345,45 +256,145 @@
   margin-top: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px;
   font-size: 12px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+[data-theme="light"]
+.dash-kpiSubText {
+  color: #D0C4F0;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .dash-kpiSubText {
   color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
   white-space: nowrap;
 }
 
-.dash-kpiExtra {
-  margin-top: 12px;
-}
+.dash-kpiExtra { margin-top: 12px; }
 
 .trend {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-  font-weight: 750;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
-.trend i {
-  font-size: 14px;
-  line-height: 1;
-}
-
+.trend i { font-size: 14px; line-height: 1; }
 .trend.up { color: var(--accent-green); }
 .trend.down { color: var(--accent-red); }
 
 /* =========================
-   MONTHLY LIMIT (limit.png)
+   MONTHLY LIMIT PANEL
    ========================= */
+.dash-limitPanel .glass-content {
+  padding: 18px;
+  min-height: 280px;
+  overflow: visible;
+}
+
+.dash-subHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dash-recentActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+}
+
+.dash-pagerBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.90);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.dash-pagerBtn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.14);
+}
+.dash-pagerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dash-pagerText {
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(255,255,255,0.78);
+  letter-spacing: -0.01em;
+  min-width: 44px;
+  text-align: center;
+}
+
+.dash-subTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.01em;
+}
+
+.dash-subHint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.dash-limitBody { display: flex; flex-direction: column; gap: 12px; }
+
+.dash-limitLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.dash-limitValue {
+  font-size: 14px;
+  font-weight: 750;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+}
+
+.dash-limitHeaderRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: -2px;
+}
+
 .limit-range {
   display: flex;
   flex-direction: column;
@@ -408,103 +419,354 @@
 }
 
 .limit-tick {
-  flex: 0 0 1px;
-  width: 1px;
+  flex: 0 0 2px;
+  width: 2px;
   height: 12px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.18);
   opacity: 0.92;
 }
 
 .limit-tick.active {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Speedometer */
+.dash-limitGauge {
+  margin-top: -14px;
+}
+
+.dash-speedoWrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin-top: -16px;
+}
+
+.dash-speedo {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  display: block;
+}
+
+.dash-limitPct {
+  margin-top: -2px;
+  font-size: 24px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  letter-spacing: -0.02em;
 }
 
 /* =========================
-   MY CARDS / GOALS (bottom row)
+   ACTIVITY PANEL (Recent + Category)
    ========================= */
-.dash-cardsPanel .glass-content,
-.dash-goalsPanel .glass-content {
-  padding: 18px 18px;
+.dash-activityPanel .glass-content {
+  padding: 18px;
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 560px;
 }
 
-.accounts-grid {
+.dash-activityGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1.35fr 1fr;
   gap: 16px;
-  margin-top: 12px;
+  align-items: start;
+  flex: 1;
 }
+
 @media (max-width: 1180px) {
-  .accounts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 700px) {
-  .accounts-grid { grid-template-columns: 1fr; }
+  .dash-activityGrid { grid-template-columns: 1fr; }
 }
 
-.dash-cardsPanel .account-card-glass {
-  min-height: 210px;
-  aspect-ratio: 1.55 / 1;
+/* Recent table (no nested card) */
+.dash-recentTableWrap {
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
-.dash-goalsList {
+.dash-recentHead,
+.dash-recentRow {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr 1fr 1fr 1.5fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px;
+}
+
+.dash-recentHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(0,0,0,0.12);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.70);
+}
+
+.dash-recentBody {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.dash-recentPager {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.dash-recentRow {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 12px;
+  color: rgba(255,255,255,0.88);
+}
+.dash-recentRow:last-child { border-bottom: none; }
+.dash-recentRow:hover { background: rgba(255,255,255,0.03); }
+
+.dash-recentColDate { color: rgba(255,255,255,0.62); text-align: center; }
+.dash-recentColAmt { text-align: right; font-weight: 750; color: rgba(255,255,255,0.92); }
+.dash-recentColAcc { text-align: center; color: rgba(255,255,255,0.78); }
+.dash-recentColMemo { color: rgba(255,255,255,0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.dash-recentColCat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dash-recentDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.dash-recentCatName {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 650;
+}
+
+.dash-donutWrap {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* No nested card for donut */
+.dash-donutBox { padding: 0; }
+
+.dash-donutChart {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  flex: 0 0 auto;
+  filter: none;
+}
+
+.dash-donutChart svg { outline: none; }
+
+.dash-donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dash-donutPct {
+  font-size: 30px;
+  font-weight: 850;
+  color: rgba(255, 255, 255, 0.94);
+  letter-spacing: -0.02em;
+}
+
+.dash-donutLabel {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.dash-donutLegend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dash-legendRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dash-legendName {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.dash-legendPct {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 650;
+  min-width: 44px;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .dash-donutWrap { flex-direction: column; align-items: stretch; }
+  .dash-donutChart { margin: 0 auto; }
+}
+
+/* =========================
+   BILL & PAYMENT (bill_pay.png)
+   ========================= */
+.dash-billsPanel .glass-content {
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 12px;
+  min-height: 560px;
 }
 
-.dash-goalRow {
-  border-radius: 16px;
-  padding: 14px 14px;
+.dash-billsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dash-billAdd {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.86);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+.dash-billAdd:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.dash-billsBody { display: flex; flex-direction: column; gap: 12px; }
+
+.dash-billCard {
+  padding: 14px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.dash-goalTop {
+.dash-billTop {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-billIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  font-weight: 850;
+  color: rgba(255, 255, 255, 0.90);
 }
 
-.dash-goalName {
+.dash-billMeta { min-width: 0; }
+
+.dash-billName {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 750;
   color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.dash-goalPct {
+.dash-billDate {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.dash-billStatus {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
   font-size: 12px;
   font-weight: 750;
   color: rgba(255, 255, 255, 0.86);
+  white-space: nowrap;
 }
 
-.dash-goalAmounts {
-  margin-top: 8px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.74);
+.dash-billStatus.scheduled {
+  background: rgba(245, 124, 0, 0.12);
+  border-color: rgba(245, 124, 0, 0.20);
+  color: rgba(255, 214, 170, 0.98);
 }
 
-.dash-goalSep { margin: 0 6px; color: rgba(255, 255, 255, 0.45); }
-.dash-goalTarget { color: rgba(255, 255, 255, 0.86); font-weight: 650; }
-
-.dash-goalTrack {
+.dash-billAmount {
   margin-top: 10px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.dash-goalFill {
-  height: 100%;
-  border-radius: 999px;
+.dash-billsViewAll {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.90);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.dash-billsViewAll:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .dash-empty {
@@ -513,12 +775,19 @@
   font-size: 13px;
 }
 
-/* Recharts tooltip polish */
-.recharts-tooltip-cursor { fill: rgba(255,255,255,0.05) !important; }
-.recharts-default-tooltip {
-  background-color: rgba(10, 12, 16, 0.92) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.45) !important;
-  padding: 12px !important;
+/* Small link button used in panels */
+.dash-linkBtn {
+  border: 0;
+  background: transparent;
+  color: rgba(0, 230, 118, 0.92);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.dash-linkBtn:hover {
+  background: rgba(0, 230, 118, 0.12);
+  color: rgba(200, 255, 232, 0.96);
 }

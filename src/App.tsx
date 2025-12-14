@@ -18,6 +18,7 @@ import {
   CategoriesView,
   AccountsView,
   ReportsView,
+  BillsView,
   SavingsView
 } from './components/views';
 import { viewMeta } from './components/common/utils';
@@ -37,6 +38,7 @@ import './styles/components/categories.css';
 import './styles/components/accounts.css';
 import './styles/components/reports.css';
 import './styles/components/savings.css';
+import './styles/components/bills.css';
 import './styles/components/shared.css';
 
 const App: React.FC = () => {
@@ -211,11 +213,7 @@ const App: React.FC = () => {
   const refreshLoans = async () => setLoans(await loansApi.list());
   const refreshGoals = async () => setSavingsGoals(await savingsGoalsApi.list());
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setUserProfile(null);
-  };
+  // Logout is currently not shown in the top-right UI.
 
   const changeMonth = (delta: number) => {
     const [y, m] = month.split('-').map(Number);
@@ -240,6 +238,7 @@ const App: React.FC = () => {
       case 'transactions': return '모든 수입과 지출 내역';
       case 'budgets': return '예산 설정 및 관리';
       case 'accounts': return '내 자산과 계좌 현황';
+      case 'bills': return '정기 결제/납부 관리';
       default: return 'Finance Overview';
     }
   };
@@ -293,6 +292,7 @@ const App: React.FC = () => {
                 <NavItem viewKey="accounts" label="Accounts" active={view === 'accounts'} iconPath="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V72H40V56Zm0,144H40V88H216V200Zm-24-40a8,8,0,1,1-8-8A8,8,0,0,1,192,160Z" />
                 <NavItem viewKey="budgets" label="Budgets" active={view === 'budgets'} iconPath="M216,72H182.43L170.89,37.36a16,16,0,0,0-30.34,1.35L128,88.38,115.45,38.71a16,16,0,0,0-30.9,0L68.83,104H40a8,8,0,0,0,0,16H76.47l12.75-42.5,12.23,48.29A16,16,0,0,0,117,137.64l1.45-.18A16,16,0,0,0,131.56,125l12.89-51.11L156.17,120H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16H172.66l-4.78-19.11L188,73.11V184a8,8,0,0,1-8,8H72a8,8,0,0,1-8-8V152a8,8,0,0,0-16,0v32a24,24,0,0,0,24,24H180a24,24,0,0,0,24-24V88h12a8,8,0,0,0,0-16Z" badge={{text:'16', style:{}}} />
                 <NavItem viewKey="reports" label="Reports" active={view === 'reports'} iconPath="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48ZM216,192H40V64H216V192ZM48,96a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,96Zm0,32a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H56A8,8,0,0,1,48,160Z" badge={{text:'New', style:{background:'#e65100'}}} />
+                <NavItem viewKey="bills" label="고정지출" active={view === 'bills'} iconPath="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V80H48Zm160,144H48V96H208v104Zm-28-72H76a8,8,0,0,1,0-16H180a8,8,0,0,1,0,16Zm0,40H76a8,8,0,0,1,0-16H180a8,8,0,0,1,0,16Z" />
                 <NavItem viewKey="savings" label="Savings" active={view === 'savings'} iconPath="M224,112h-8V80a16,16,0,0,0-16-16H168V48a16,16,0,0,0-16-16H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V128h8a8,8,0,0,0,0-16ZM152,48v16H48V48Zm0,32v32H48V80Zm-88,48v80H48V128Zm16,80V128h72v80Zm128,0H168v-8a8,8,0,0,0-8-8H160a24,24,0,0,0-24-24h16V80h48v32h8a8,8,0,0,0,0,16h-8v64h8a8,8,0,0,0,0,16Z" />
                 <NavItem label="Settings" iconPath="M120.17,222.11l-5.64,22.56a8,8,0,0,1-15.52,0l-5.64-22.56a8,8,0,0,0-5.83-5.83l-22.56-5.64a8,8,0,0,1,0-15.52l22.56-5.64a8,8,0,0,0,5.83-5.83l5.64-22.56a8,8,0,0,1,15.52,0l5.64,22.56a8,8,0,0,0,5.83,5.83l22.56,5.64a8,8,0,0,1,0,15.52l-22.56,5.64A8,8,0,0,0,120.17,222.11ZM221.46,127l-15-5.36a44.1,44.1,0,0,0-5.26-12.7l7.56-14a8,8,0,0,0-2.47-10.91l-24-16a8,8,0,0,0-11,.77l-10.22,11.49a43.62,43.62,0,0,0-13.74-1.61L143.54,44a8,8,0,0,0-7.54-5.95H108a8,8,0,0,0-7.54,5.95L96.71,58.7a43.62,43.62,0,0,0-13.74,1.61L72.75,48.82a8,8,0,0,0-11-.77l-24,16a8,8,0,0,0-2.47,10.91l7.56,14a44.1,44.1,0,0,0-5.26,12.7l-15,5.36A8,8,0,0,0,17.16,134.7l10,27.42a8,8,0,0,0,10.16,4.88l15.69-5.61a43.85,43.85,0,0,0,9.92,9.6l-2.61,16.42a8,8,0,0,0,6.59,9.11l28.28,4.52a8,8,0,0,0,9.17-6.66l2.36-16.46a43.66,43.66,0,0,0,13.56,0l2.36,16.46a8,8,0,0,0,9.17,6.66l28.28-4.52a8,8,0,0,0,6.59-9.11l-2.61-16.42a43.85,43.85,0,0,0,9.92-9.6l15.69,5.61a8,8,0,0,0,10.16-4.88l10-27.42A8,8,0,0,0,221.46,127ZM128,156a28,28,0,1,1,28-28A28,28,0,0,1,128,156Z" />
               </nav>
@@ -328,9 +328,6 @@ const App: React.FC = () => {
                   <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.9,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>
                   <div className="notif-dot" />
                 </button>
-                <button className="icon-btn" onClick={handleLogout} title="Logout">
-                  <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm45.66-93.66a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,11.32-11.32L120,132.69V88a8,8,0,0,1,16,0v44.69l10.34-10.35A8,8,0,0,1,173.66,122.34Z"/></svg>
-                </button>
               </div>
             </header>
 
@@ -344,6 +341,7 @@ const App: React.FC = () => {
                   savingsGoals={savingsGoals}
                   categories={categories}
                   accounts={accounts}
+                  yearlyStats={yearlyStats}
                   currency={currency}
                   month={month}
                   onNavigate={setView}
@@ -353,7 +351,8 @@ const App: React.FC = () => {
               {view === 'budgets' && <BudgetsView budgets={budgets} categories={categories} stats={stats} currency={currency} month={month} transactions={transactions} onRefresh={refreshBudgets} />}
               {view === 'categories' && <CategoriesView categories={categories} onRefresh={refreshCategories} />}
               {view === 'accounts' && <AccountsView accounts={accounts} currency={currency} monthlySpend={monthlyAccountSpend} categories={categories} loans={loans} onRefresh={refreshAccounts} onRefreshLoans={refreshLoans} />}
-              {view === 'reports' && <ReportsView stats={stats} yearlyStats={yearlyStats} currency={currency} />}
+              {view === 'reports' && <ReportsView stats={stats} yearlyStats={yearlyStats} budgets={budgets} currency={currency} />}
+              {view === 'bills' && <BillsView currency={currency} />}
               {view === 'savings' && <SavingsView goals={savingsGoals} currency={currency} onRefresh={refreshGoals} />}
             </div>
           </div>

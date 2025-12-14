@@ -17,7 +17,7 @@ interface BudgetsViewProps {
 }
 
 export const BudgetsView: React.FC<BudgetsViewProps> = ({ 
-  budgets, categories, stats, currency, month, transactions, onRefresh 
+  budgets, categories, stats, currency, transactions, onRefresh 
 }) => {
   const expenseCategories = useMemo(() => 
     categories.filter((c) => c.type === 'expense'),
@@ -96,7 +96,6 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           <div className="panel-header">
             <div>
               <div className="panel-title">예산 관리</div>
-              <div className="panel-sub">{month}  예산</div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={openCreate}>예산 추가</button>
           </div>

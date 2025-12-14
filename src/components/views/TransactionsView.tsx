@@ -94,17 +94,27 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const selectedDayTransactions = selectedDate ? transactionsByDate[selectedDate] || [] : [];
   const today = new Date().toISOString().split('T')[0];
 
+  const selectedDaySummary = useMemo(() => {
+    const summary = { income: 0, expense: 0, transfer: 0 };
+    for (const t of selectedDayTransactions) {
+      if (t.type === 'income') summary.income += t.amount;
+      else if (t.type === 'expense') summary.expense += t.amount;
+      else summary.transfer += t.amount;
+    }
+    return summary;
+  }, [selectedDayTransactions]);
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div className="transactions-toolbar">
         <h2 className="panel-title">Transactions</h2>
         <button className="btn btn-primary" onClick={() => { setEditingTransaction(null); setShowForm(true); }}>
           <Icons.Plus /> 새 거래
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: 20, height: 'calc(100vh - 200px)' }}>
-        <LiquidPanel>
+      <div className="transactions-layout">
+        <LiquidPanel className="tx-calendarPanel">
           <div className="calendar">
             <div className="calendar-header">일</div>
             <div className="calendar-header">월</div>
@@ -144,45 +154,69 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </div>
         </LiquidPanel>
 
-        <LiquidPanel>
-          <div className="panel-header">
+        <LiquidPanel className="tx-dayPanel">
+          <div className="tx-dayHeader">
             <div>
-              <div className="panel-title">
-                {selectedDate ? formatDate(selectedDate) : '날짜를 선택하세요'}
-              </div>
-              <div className="panel-sub">
-                {selectedDayTransactions.length}건의 거래
-              </div>
+              <div className="tx-dayTitle">{selectedDate ? formatDate(selectedDate) : '날짜를 선택하세요'}</div>
+              <div className="tx-daySub">{selectedDayTransactions.length}건의 거래</div>
             </div>
+            {selectedDate && (
+              <div className="tx-dayTotals">
+                <div className="tx-dayTotal income">
+                  <span className="tx-dayTotalLabel">수입</span>
+                  <span className="tx-dayTotalVal">{formatCurrency(selectedDaySummary.income, currency)}</span>
+                </div>
+                <div className="tx-dayTotal expense">
+                  <span className="tx-dayTotalLabel">지출</span>
+                  <span className="tx-dayTotalVal">{formatCurrency(selectedDaySummary.expense, currency)}</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div style={{flex: 1, overflowY: 'auto'}}>
+          <div className="tx-dayBody">
             {selectedDayTransactions.length > 0 ? (
-              <div className="transactions-table-lite manage-table">
-                {/* Table Header removed for side panel simplicity, or keep it minimal */}
-                {selectedDayTransactions.map((t) => (
-                  <div key={t.id} className="tx-row manage-row" style={{gridTemplateColumns: '1fr auto', padding: '12px 0', borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                    <div style={{display:'flex', flexDirection:'column', gap:4}}>
-                      <div className="tx-name" style={{fontWeight:600}}>{t.category_name}</div>
-                      <div className="tx-memo" style={{fontSize:12, color:'var(--text-muted)'}}>{t.memo || '-'}</div>
-                      <span className={`badge ${t.type}`} style={{width:'fit-content', fontSize:10, padding:'2px 6px'}}>
-                        {t.type === 'income' ? '수입' : t.type === 'expense' ? '지출' : '이체'}
-                      </span>
-                    </div>
-                    <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:8}}>
-                      <div className={`tx-amount ${t.type === 'income' ? 'positive' : 'negative'}`} style={{fontWeight:700}}>
-                        {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
+              <div className="tx-dayTableWrap">
+                <div className="tx-dayTableHead">
+                  <div className="tx-dayCol-date">날짜</div>
+                  <div className="tx-dayCol-type">유형</div>
+                  <div className="tx-dayCol-cat">카테고리</div>
+                  <div className="tx-dayCol-amt">금액</div>
+                  <div className="tx-dayCol-acc">계좌</div>
+                  <div className="tx-dayCol-memo">메모</div>
+                  <div className="tx-dayCol-actions">관리</div>
+                </div>
+
+                <div className="tx-dayTableBody">
+                  {selectedDayTransactions.map((t) => (
+                    <div key={t.id} className="tx-dayTableRow">
+                      <div className="tx-dayCol-date">{formatDate(t.date)}</div>
+                      <div className="tx-dayCol-type">
+                        <span className={`badge ${t.type}`}>
+                          {t.type === 'income' ? '수입' : t.type === 'expense' ? '지출' : '이체'}
+                        </span>
                       </div>
-                      <div className="tx-col-actions" style={{gap:12, flexWrap:'wrap'}}>
-                        <button className="btn btn-sm" onClick={() => handleEdit(t)}>수정</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>삭제</button>
+                      <div className="tx-dayCol-cat">{t.category_name || 'Uncategorized'}</div>
+                      <div className={`tx-dayCol-amt ${t.type}`}>
+                        {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}
+                        {formatCurrency(t.amount, currency)}
+                      </div>
+                      <div className="tx-dayCol-acc">{t.account_name || '-'}</div>
+                      <div className="tx-dayCol-memo">{t.memo || '-'}</div>
+                      <div className="tx-dayCol-actions">
+                        <button className="btn btn-sm" onClick={() => handleEdit(t)}>
+                          수정
+                        </button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>
+                          삭제
+                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
+              <div className="tx-dayEmpty">
                 {selectedDate ? '거래 내역이 없습니다.' : '달력에서 날짜를 선택하여 상세 내역을 확인하세요.'}
               </div>
             )}

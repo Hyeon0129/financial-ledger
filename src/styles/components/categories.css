@@ -52,3 +52,146 @@
   color: var(--text-primary);
 }
 
+/* Flat list (no nested cards) */
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.cat-head,
+.cat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px;
+}
+
+.cat-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.70);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.12);
+}
+
+.cat-row {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.cat-row:last-child { border-bottom: none; }
+.cat-row:hover { background: rgba(255,255,255,0.03); }
+
+.cat-col-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.cat-name {
+  font-weight: 650;
+  color: rgba(255,255,255,0.90);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-col-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* Expense grid (no nested table/card) */
+.cat-grid {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.cat-gridHead,
+.cat-gridRow {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.6fr 220px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px;
+}
+
+@media (max-width: 860px) {
+  .cat-gridHead,
+  .cat-gridRow {
+    grid-template-columns: 1.2fr 1.2fr 0.6fr 200px;
+  }
+}
+
+.cat-gridHead {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.70);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.12);
+}
+
+.cat-gridRow {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.88);
+  font-size: 13px;
+}
+.cat-gridRow:last-child { border-bottom: none; }
+.cat-gridRow:hover { background: rgba(255,255,255,0.03); }
+
+.cat-gridRow.is-parent {
+  background: rgba(255,255,255,0.02);
+}
+
+.cat-grid .cat-col-parent,
+.cat-grid .cat-col-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cat-grid .cat-col-type {
+  text-align: center;
+  color: rgba(255,255,255,0.70);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cat-grid .cat-col-actions {
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cat-muted {
+  color: rgba(255,255,255,0.62);
+}
+
+.cat-indent {
+  color: rgba(255,255,255,0.40);
+  flex: 0 0 auto;
+}
+
+.cat-empty {
+  padding: 24px 12px;
+  color: rgba(255,255,255,0.62);
+  text-align: center;
+}
