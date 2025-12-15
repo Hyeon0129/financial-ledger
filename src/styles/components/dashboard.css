@@ -392,7 +392,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  margin-top: -2px;
+  margin-top: 4px;
 }
 
 .limit-range {
@@ -474,9 +474,10 @@
 .dash-activityGrid {
   display: grid;
   grid-template-columns: 1.35fr 1fr;
-  gap: 16px;
-  align-items: start;
+  gap: 24px;
+  align-items: stretch;
   flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 1180px) {
@@ -512,7 +513,7 @@
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.70);
+  color: rgba(255,255,255,0.86);
 }
 
 .dash-recentBody {
@@ -522,18 +523,21 @@
 }
 
 .dash-recentPager {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   padding: 12px 12px;
   border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: auto;
+  width: 100%;
+  background: rgba(0,0,0,0.10);
 }
 
 .dash-recentRow {
   border-bottom: 1px solid rgba(255,255,255,0.06);
   font-size: 12px;
-  color: rgba(255,255,255,0.88);
+  color: rgba(255,255,255,0.76);
 }
 .dash-recentRow:last-child { border-bottom: none; }
 .dash-recentRow:hover { background: rgba(255,255,255,0.03); }
@@ -563,17 +567,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 650;
+  color: rgba(255,255,255,0.92);
 }
 
 .dash-donutWrap {
   display: flex;
   gap: 16px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 /* No nested card for donut */
-.dash-donutBox { padding: 0; }
+.dash-donutBox { padding: 0 0 0 18px; }
 
 .dash-donutChart {
   position: relative;
@@ -763,6 +768,8 @@
   font-weight: 750;
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
+  width: 160px;
+  align-self: center;
 }
 .dash-billsViewAll:hover {
   background: rgba(255, 255, 255, 0.10);
@@ -791,3 +798,11 @@
   background: rgba(0, 230, 118, 0.12);
   color: rgba(200, 255, 232, 0.96);
 }
+
+/* Light theme readability tweaks (do not touch KPI cards) */
+body[data-theme="light"] .dash-subHint { color: rgba(255,255,255,0.76); }
+body[data-theme="light"] .dash-recentHead { color: rgba(255,255,255,0.82); }
+body[data-theme="light"] .dash-recentRow { color: rgba(255,255,255,0.80); }
+body[data-theme="light"] .dash-recentColDate { color: rgba(255,255,255,0.72); }
+body[data-theme="light"] .dash-recentColAcc { color: rgba(255,255,255,0.74); }
+body[data-theme="light"] .dash-recentColMemo { color: rgba(255,255,255,0.72); }

@@ -289,8 +289,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <AreaChart data={expenseChartData} margin={{ top: 18, right: 18, left: 10, bottom: 8 }}>
               <defs>
                 <linearGradient id="expenseArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="rgba(0, 230, 118, 0.22)" />
-                  <stop offset="95%" stopColor="rgba(0, 230, 118, 0.00)" />
+                  <stop offset="5%" stopColor="var(--chart-expense-fill-1)" />
+                  <stop offset="95%" stopColor="var(--chart-expense-fill-2)" />
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 10" />
@@ -328,14 +328,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="rgba(0, 230, 118, 0.90)"
+                stroke="var(--chart-expense-stroke)"
                 strokeWidth={3}
                 fill="url(#expenseArea)"
                 dot={false}
                 activeDot={{
                   r: 5,
                   fill: 'rgba(12, 12, 14, 0.95)',
-                  stroke: 'rgba(0, 230, 118, 0.92)',
+                  stroke: 'var(--chart-expense-dot-stroke)',
                   strokeWidth: 3,
                 }}
               />

@@ -103,6 +103,12 @@
   /* Semantic */
   --success: var(--accent-green);
   --danger: var(--accent-red);
+
+  /* Charts */
+  --chart-expense-stroke: rgba(0, 230, 118, 0.90);
+  --chart-expense-dot-stroke: rgba(0, 230, 118, 0.92);
+  --chart-expense-fill-1: rgba(0, 230, 118, 0.22);
+  --chart-expense-fill-2: rgba(0, 230, 118, 0.00);
 }
 
 /* Light Theme Overrides */
@@ -133,6 +139,12 @@
   --glass-sat: 160%;
   --glass-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   --glass-hover-shadow: 0 20px 65px rgba(0, 0, 0, 0.32);
+
+  /* Charts (purple for light theme) */
+  --chart-expense-stroke: rgba(168, 85, 247, 0.92);
+  --chart-expense-dot-stroke: rgba(168, 85, 247, 0.92);
+  --chart-expense-fill-1: rgba(168, 85, 247, 0.20);
+  --chart-expense-fill-2: rgba(168, 85, 247, 0.00);
 }
 
 /* Base Reset */
@@ -166,7 +178,7 @@ body[data-theme="dark"] {
 }
 
 body[data-theme="light"] {
-  background: url('https://images.unsplash.com/photo-1637825891028-564f672aa42c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8bWFjYm9vayUyMHBybyUyMHdhbGxwYXBlcnxlbnwwfHwwfHx8MA%3D%3D') 
+  background: url('https://images.unsplash.com/photo-1637825891028-564f672aa42c?w=1920&q=80') 
   no-repeat center center/cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -268,6 +280,16 @@ body[data-theme="light"] .glass.interactive:hover {
   transform: translateY(-1px);
   box-shadow: var(--glass-hover-shadow);
   border-color: rgba(255, 255, 255, 0.26);
+}
+
+/* Light theme: keep KPI trend readable on purple background */
+body[data-theme="light"] .trend.up {
+  color: rgba(34, 197, 94, 0.96);
+  text-shadow: 0 0 14px rgba(34, 197, 94, 0.18);
+}
+body[data-theme="light"] .trend.down {
+  color: rgba(248, 113, 113, 0.96);
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.14);
 }
 
 .glass-content {

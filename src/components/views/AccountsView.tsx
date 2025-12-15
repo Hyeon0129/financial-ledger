@@ -13,12 +13,13 @@ interface AccountsViewProps {
   monthlySpend: Record<string, number>;
   categories: Category[];
   loans: Loan[];
+  userEmail: string;
   onRefresh: () => void;
   onRefreshLoans: () => void;
 }
 
 export const AccountsView: React.FC<AccountsViewProps> = ({ 
-  accounts, currency, monthlySpend, categories, loans, onRefresh, onRefreshLoans 
+  accounts, currency, monthlySpend, categories, loans, userEmail, onRefresh, onRefreshLoans 
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -51,6 +52,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
               index={idx} 
               currency={currency}
               monthlySpend={monthlySpend[account.id] || 0}
+              userEmail={userEmail}
             />
           </div>
         ))}
@@ -71,6 +73,8 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
               <div className="loan-col-num">남은 원금</div>
               <div className="loan-col-num">월 상환액</div>
               <div className="loan-col-rate">금리</div>
+              <div className="loan-col-method">상환방식</div>
+              <div className="loan-col-left">남은개월</div>
               <div className="loan-col-progress">진행률</div>
               <div className="loan-col-due">다음 납부</div>
               <div className="loan-col-actions">관리</div>
@@ -79,6 +83,15 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
             {loans.map((loan) => {
               const paidAmount = Math.max(0, loan.principal - (loan.remaining_principal ?? 0));
               const progress = loan.principal > 0 ? Math.min(100, (paidAmount / loan.principal) * 100) : 0;
+              const monthsLeft = Math.max(0, (loan.term_months ?? 0) - (loan.paid_months ?? 0));
+              const methodLabel =
+                loan.repayment_type === 'amortized'
+                  ? '원리금균등'
+                  : loan.repayment_type === 'interest_only'
+                    ? '이자만'
+                    : loan.repayment_type === 'principal_equal'
+                      ? '원금균등'
+                      : '-';
               return (
                 <div key={loan.id} className="loan-row">
                   <div className="loan-col-name">
@@ -88,6 +101,8 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
                   <div className="loan-col-num loan-strong">{formatCurrency(Math.round(loan.remaining_principal), currency)}</div>
                   <div className="loan-col-num loan-danger">{formatCurrency(loan.monthly_payment, currency)}</div>
                   <div className="loan-col-rate">{loan.interest_rate}%</div>
+                  <div className="loan-col-method">{methodLabel}</div>
+                  <div className="loan-col-left">{monthsLeft}개월</div>
                   <div className="loan-col-progress">
                     <div className="loan-progress">
                       <div className="loan-progressTrack">

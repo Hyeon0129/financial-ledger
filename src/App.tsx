@@ -350,7 +350,7 @@ const App: React.FC = () => {
               {view === 'transactions' && <TransactionsView transactions={transactions} categories={categories} accounts={accounts} currency={currency} month={month} onRefresh={refreshTransactions} />}
               {view === 'budgets' && <BudgetsView budgets={budgets} categories={categories} stats={stats} currency={currency} month={month} transactions={transactions} onRefresh={refreshBudgets} />}
               {view === 'categories' && <CategoriesView categories={categories} onRefresh={refreshCategories} />}
-              {view === 'accounts' && <AccountsView accounts={accounts} currency={currency} monthlySpend={monthlyAccountSpend} categories={categories} loans={loans} onRefresh={refreshAccounts} onRefreshLoans={refreshLoans} />}
+              {view === 'accounts' && <AccountsView accounts={accounts} currency={currency} monthlySpend={monthlyAccountSpend} categories={categories} loans={loans} userEmail={userProfile?.email ?? ''} onRefresh={refreshAccounts} onRefreshLoans={refreshLoans} />}
               {view === 'reports' && <ReportsView stats={stats} yearlyStats={yearlyStats} budgets={budgets} currency={currency} />}
               {view === 'bills' && <BillsView currency={currency} />}
               {view === 'savings' && <SavingsView goals={savingsGoals} currency={currency} onRefresh={refreshGoals} />}

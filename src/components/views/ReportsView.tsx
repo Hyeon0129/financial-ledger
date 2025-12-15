@@ -352,6 +352,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
     topCategory.sharePct,
   ]);
 
+  const renderInsightText = (text: string) => {
+    const tokenRe = /([+-]?₩\s?[\d,]+|\d+%)/g;
+    const tokenCheckRe = /^([+-]?₩\s?[\d,]+|\d+%)$/;
+    const parts = text.split(tokenRe);
+    return parts
+      .filter((p) => p.length > 0)
+      .map((part, idx) => {
+        if (tokenCheckRe.test(part)) {
+          const isBad = part.trim().startsWith('-');
+          return (
+            <span key={`${idx}-${part}`} className={`reports-insightEmph${isBad ? ' bad' : ''}`}>
+              {part}
+            </span>
+          );
+        }
+        return <React.Fragment key={`${idx}-${part}`}>{part}</React.Fragment>;
+      });
+  };
+
   return (
     <div className="reports-layout">
       <div className="reports-kpiGrid">
@@ -558,11 +577,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
             </div>
           </div>
           <div className="reports-insightsBox" aria-label={`Insights for ${insightMonthKey}`}>
-            <div className="reports-insightsHeadline">{insights.headline}</div>
+            <div className="reports-insightsHeadline">{renderInsightText(insights.headline)}</div>
             <ul className="reports-insightsBullets">
               {insights.bullets.map((t) => (
                 <li key={t} className="reports-insightsBullet">
-                  {t}
+                  {renderInsightText(t)}
                 </li>
               ))}
             </ul>

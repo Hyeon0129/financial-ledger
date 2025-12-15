@@ -176,9 +176,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
           <div className="tx-dayBody">
             {selectedDayTransactions.length > 0 ? (
-              <div className="tx-dayTableWrap">
+                <div className="tx-dayTableWrap">
                 <div className="tx-dayTableHead">
-                  <div className="tx-dayCol-date">날짜</div>
+                  <div className="tx-dayCol-dateHead">날짜</div>
                   <div className="tx-dayCol-type">유형</div>
                   <div className="tx-dayCol-cat">카테고리</div>
                   <div className="tx-dayCol-amt">금액</div>

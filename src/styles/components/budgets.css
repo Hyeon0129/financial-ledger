@@ -56,3 +56,131 @@ body[data-theme="dark"] .progress-track {
   font-feature-settings: 'tnum';
 }
 
+/* ========== Budgets Tables (Unified spacing/alignment) ========== */
+.budgets-grid {
+  gap: 20px;
+}
+
+.budgets-budgetHead,
+.budgets-budgetRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+}
+
+.budgets-budgetHead {
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.88);
+}
+
+.budgets-budgetRow {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 14px;
+  color: rgba(255,255,255,0.78);
+}
+.budgets-budgetRow:last-child { border-bottom: none; }
+
+.budgets-cell {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.budgets-cell-cat {
+  justify-content: center;
+}
+
+.budgets-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.budgets-catName {
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.budgets-cell-num {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+.budgets-cell-num.spent { color: rgba(255, 23, 68, 0.90); font-weight: 800; }
+.budgets-cell-num.remaining { color: rgba(0, 230, 118, 0.86); font-weight: 800; }
+
+.budgets-cell-actions {
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Expense list table */
+.budgets-expenseHead,
+.budgets-expenseRow {
+  display: grid;
+  grid-template-columns: 0.9fr 1.2fr 1fr 1fr 1.5fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+}
+
+.budgets-expenseHead {
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.88);
+}
+
+.budgets-expenseRow {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 14px;
+  color: rgba(255,255,255,0.78);
+}
+.budgets-expenseRow:last-child { border-bottom: none; }
+
+.budgets-cell-dateHead,
+.budgets-cell-catHead,
+.budgets-cell-numHead,
+.budgets-cell-accHead,
+.budgets-cell-memoHead {
+  justify-content: center;
+}
+
+.budgets-cell-date {
+  justify-content: flex-start;
+  color: rgba(255,255,255,0.70);
+  font-size: 13px;
+}
+
+.budgets-cell-catVal,
+.budgets-cell-numVal,
+.budgets-cell-accVal,
+.budgets-cell-memoVal {
+  justify-content: center;
+}
+
+.budgets-cell-numVal {
+  color: rgba(255,255,255,0.92);
+  font-weight: 850;
+}
+
+.budgets-cell-memoVal {
+  color: rgba(255,255,255,0.70);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

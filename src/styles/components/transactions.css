@@ -354,7 +354,7 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 }
 
 .tx-dayTitle {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 750;
   color: rgba(255,255,255,0.92);
   letter-spacing: -0.01em;
@@ -362,7 +362,7 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 
 .tx-daySub {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 16px;
   color: rgba(255,255,255,0.62);
 }
 
@@ -377,7 +377,7 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
+  font-size: 16px;
   color: rgba(255,255,255,0.62);
 }
 
@@ -419,11 +419,11 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
   z-index: 1;
   background: rgba(0,0,0,0.12);
   border-bottom: 1px solid rgba(255,255,255,0.10);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.70);
+  color: rgba(255,255,255,0.86);
 }
 
 .tx-dayTableBody {
@@ -432,12 +432,13 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 
 .tx-dayTableRow {
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  font-size: 12px;
-  color: rgba(255,255,255,0.88);
+  font-size: 15px;
+  color: rgba(255,255,255,0.78);
 }
 .tx-dayTableRow:last-child { border-bottom: none; }
 .tx-dayTableRow:hover { background: rgba(255,255,255,0.03); }
 
+.tx-dayCol-dateHead { text-align: center; color: rgba(255,255,255,0.86); }
 .tx-dayCol-date { text-align: left; color: rgba(255,255,255,0.62); }
 .tx-dayCol-type { text-align: center; }
 .tx-dayCol-cat { text-align: center; }
