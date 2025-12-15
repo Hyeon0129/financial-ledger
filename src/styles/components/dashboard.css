@@ -571,10 +571,12 @@
 
 .dash-recentColCat { min-width: 0; }
 .dash-recentHead .dash-recentColCat { display: block; }
+.dash-recentRow .dash-recentColDate { padding-left: 25px; }
 .dash-recentRow .dash-recentColCat {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding-left: 30px;
 }
 
 .dash-recentDot {
