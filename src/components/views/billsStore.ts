@@ -31,7 +31,6 @@ const LEGACY_KEYS = ['my-ledger:bills:v2', 'my-ledger:bills:v1'] as const;
 
 const statusLabel = (status: BillStatus) => {
   if (status === 'paid') return 'Paid';
-  if (status === 'overdue') return 'Overdue';
   return 'Scheduled';
 };
 
@@ -209,18 +208,23 @@ export const saveBills = (items: RecurringBill[]) => {
 };
 
 export const newBillId = () => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const formatLocalISO = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const todayISO = () => formatLocalISO(new Date());
 const currentMonthKey = () => todayISO().slice(0, 7);
 
 export const deriveBill = (bill: RecurringBill, month: string, accounts: Account[]): BillItem => {
   const dueDate = dueDateForMonth(bill, month) ?? `${month}-01`;
   const account = accounts.find((a) => a.id === bill.accountId);
-  const acctBal = account?.balance ?? 0;
 
   let status: BillStatus = 'scheduled';
   const nowMonth = currentMonthKey();
@@ -231,11 +235,7 @@ export const deriveBill = (bill: RecurringBill, month: string, accounts: Account
     status = 'scheduled';
   } else {
     const today = todayISO();
-    if (today < dueDate) {
-      status = 'scheduled';
-    } else {
-      status = acctBal >= bill.amount ? 'paid' : 'overdue';
-    }
+    status = today < dueDate ? 'scheduled' : 'paid';
   }
 
   return {

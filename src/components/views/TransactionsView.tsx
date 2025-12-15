@@ -91,7 +91,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     return grouped;
   }, [transactions]);
 
-  const selectedDayTransactions = selectedDate ? transactionsByDate[selectedDate] || [] : [];
+  const selectedDayTransactions = useMemo(
+    () => (selectedDate ? (transactionsByDate[selectedDate] ?? []) : []),
+    [selectedDate, transactionsByDate],
+  );
   const today = new Date().toISOString().split('T')[0];
 
   const selectedDaySummary = useMemo(() => {
@@ -257,9 +260,12 @@ const TransactionFormModal: React.FC<{
     : `${defaultMonth}-01`;
 
   const [date, setDate] = useState(editingTransaction?.date || defaultDate);
-  const [type, setType] = useState<'expense' | 'income' | 'transfer'>(
-    (editingTransaction?.type as any) || 'expense'
-  );
+  type TxType = 'expense' | 'income' | 'transfer';
+  const initialType: TxType =
+    editingTransaction?.type === 'expense' || editingTransaction?.type === 'income' || editingTransaction?.type === 'transfer'
+      ? editingTransaction.type
+      : 'expense';
+  const [type, setType] = useState<TxType>(initialType);
   // ... (Keep existing form logic)
   // Simply re-using the logic from previous file read, but applying consistent modal styles
   const [accountId, setAccountId] = useState(editingTransaction?.account_id || accounts[0]?.id || '');
@@ -385,7 +391,7 @@ const TransactionFormModal: React.FC<{
             </div>
             <div className="form-group">
               <label className="form-label">유형</label>
-              <select className="form-select" value={type} onChange={e => setType(e.target.value as any)}>
+              <select className="form-select" value={type} onChange={e => setType(e.target.value as TxType)}>
                 <option value="expense">지출</option>
                 <option value="income">수입</option>
                 <option value="transfer">이체</option>

@@ -229,6 +229,14 @@ const CategoryFormModal: React.FC<{
       showAlert('카테고리 이름을 입력해주세요.');
       return;
     }
+    const nameKey = name.trim().toLowerCase();
+    const dup = categories.find(
+      (c) => c.id !== editingCategory?.id && c.type === type && c.name.trim().toLowerCase() === nameKey
+    );
+    if (dup) {
+      showAlert('같은 이름의 카테고리가 이미 있습니다.');
+      return;
+    }
 
     setSaving(true);
     try {

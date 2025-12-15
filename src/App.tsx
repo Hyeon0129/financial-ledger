@@ -11,6 +11,8 @@ import {
   savingsGoalsApi, statsApi, userApi, loansApi,
   getMonthKey
 } from './api';
+import { dueDateForMonth, loadBills, type RecurringBill } from './components/views/billsStore';
+import { creditCardCycleRange, isoInMonth, loadAccountMeta } from './components/views/accountMetaStore';
 import {
   DashboardView,
   TransactionsView,
@@ -45,6 +47,12 @@ const App: React.FC = () => {
   const [authReady, setAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const monthReqRef = useRef(0);
+  const formatLocalISO = useCallback((d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
 
   // Authentication Setup
   useEffect(() => {
@@ -94,6 +102,9 @@ const App: React.FC = () => {
   const [prevStats, setPrevStats] = useState<MonthlyStats | null>(null);
   const [yearlyStats, setYearlyStats] = useState<{ year: number; monthlyTrend: Array<{ month: string; type: string; total: number }> } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAlarm, setShowAlarm] = useState(false);
+  const [monthDataReady, setMonthDataReady] = useState(false);
+  const autopayInFlightRef = useRef(false);
 
   // Computed Data
   const monthlyAccountSpend = useMemo(() => {
@@ -160,6 +171,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!authReady || !isLoggedIn) return;
     const reqId = ++monthReqRef.current;
+    setMonthDataReady(false);
     const loadMonthData = async () => {
       try {
         const year = Number(month.split('-')[0]);
@@ -177,6 +189,9 @@ const App: React.FC = () => {
         setPrevStats(prevMonthStats);
         setYearlyStats(yrStats);
       } catch (e) { console.error(e); }
+      finally {
+        if (reqId === monthReqRef.current) setMonthDataReady(true);
+      }
     };
     loadMonthData();
   }, [authReady, isLoggedIn, month, normalizeTransactions, prevMonthKey]);
@@ -196,6 +211,147 @@ const App: React.FC = () => {
     setYearlyStats(yrStats);
     setAccounts(accs);
   }, [month, normalizeTransactions, prevMonthKey]);
+
+  // Autopay (MVP): create due transactions automatically (idempotent by memo).
+  useEffect(() => {
+    if (!authReady || !isLoggedIn) return;
+    if (!userProfile?.id) return;
+    if (!monthDataReady) return;
+    if (!accounts.length) return;
+    if (autopayInFlightRef.current) return;
+
+    const todayISO = formatLocalISO(new Date());
+    const currentMonth = todayISO.slice(0, 7);
+    if (month !== currentMonth) return;
+
+    const bills = loadBills();
+    const memoSet = new Set(transactions.map((t) => (t.memo_raw ?? t.memo ?? '')));
+
+    const [yy, mm] = currentMonth.split('-').map(Number);
+    const monthEnd = `${currentMonth}-${String(new Date(yy, mm, 0).getDate()).padStart(2, '0')}`;
+    const limit = todayISO < monthEnd ? todayISO : monthEnd;
+
+    const dueDatesForAutopay = (bill: RecurringBill) => {
+      const first = dueDateForMonth(bill, currentMonth);
+      if (!first) return [];
+      if (bill.cadence === 'monthly' || bill.cadence === 'yearly') return first <= limit ? [first] : [];
+      const step = bill.cadence === 'weekly' ? 7 : Math.max(1, Math.floor(bill.customEveryDays ?? 0));
+      if (bill.cadence === 'custom_days' && (!Number.isFinite(step) || step <= 0)) return [];
+      const out: string[] = [];
+      let cursor = first;
+      let guard = 0;
+      while (cursor <= limit && guard < 4000) {
+        out.push(cursor);
+        const d = new Date(`${cursor}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + step);
+        cursor = d.toISOString().slice(0, 10);
+        guard += 1;
+      }
+      return out;
+    };
+
+		    const run = async () => {
+	        autopayInFlightRef.current = true;
+		      let createdAny = false;
+		      for (const b of bills) {
+		        if (!b.id || !b.categoryId || !b.accountId) continue;
+		        const dueDates = dueDatesForAutopay(b);
+		        for (const dueDate of dueDates) {
+		          const memo = `AUTO_BILL|${b.id}|${dueDate}`;
+		          if (memoSet.has(memo)) continue;
+		          await transactionsApi.create({
+		            type: 'expense',
+		            amount: b.amount,
+		            category_id: b.categoryId,
+		            account_id: b.accountId,
+		            to_account_id: null,
+		            date: dueDate,
+		            memo,
+		          });
+		          memoSet.add(memo);
+		          createdAny = true;
+		        }
+		      }
+
+	      // Credit card autopay (MVP)
+	      const ensureCardPaymentCategory = async (): Promise<string | null> => {
+	        try {
+	          const cats = await categoriesApi.list();
+	          const norm = (s: string) => s.trim().toLowerCase();
+	          const parentName = '카드';
+	          const childName = '카드대금';
+
+	          let parent = cats.find((c) => c.type === 'expense' && !c.parent_id && norm(c.name) === norm(parentName));
+	          if (!parent) {
+	            parent = await categoriesApi.create({
+	              name: parentName,
+	              type: 'expense',
+	              parent_id: null,
+	              color: '#22C55E',
+	              icon: null,
+	            });
+	          }
+
+	          let child = cats.find(
+	            (c) => c.type === 'expense' && c.parent_id === parent!.id && norm(c.name) === norm(childName),
+	          );
+	          if (!child) {
+	            child = await categoriesApi.create({
+	              name: childName,
+	              type: 'expense',
+	              parent_id: parent!.id,
+	              color: '#22C55E',
+	              icon: null,
+	            });
+	          }
+	          return child.id;
+	        } catch {
+	          return null;
+	        }
+	      };
+
+	      let cardPaymentCategoryId: string | null = null;
+	      const meta = loadAccountMeta();
+	      const creditAccounts = accounts.filter((a) => meta[a.id]?.kind === 'credit_card');
+	      for (const card of creditAccounts) {
+	        const m = meta[card.id];
+	        if (!m || m.kind !== 'credit_card') continue;
+	        if (!m.withdrawAccountId) continue;
+	        const dueDate = isoInMonth(currentMonth, Number(m.paymentDay) || 1);
+	        if (dueDate > todayISO) continue;
+
+        const cycle = creditCardCycleRange(currentMonth, m);
+        const amount = transactions
+          .filter((t) => t.type === 'expense' && t.account_id === card.id && t.date >= cycle.start && t.date <= cycle.end)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        if (amount <= 0) continue;
+
+		        const memo = `AUTO_CARD|${card.id}|${currentMonth}|${dueDate}`;
+		        if (memoSet.has(memo)) continue;
+
+		        if (!cardPaymentCategoryId) {
+		          cardPaymentCategoryId = await ensureCardPaymentCategory();
+		        }
+
+		        await transactionsApi.create({
+		          type: 'transfer',
+		          amount,
+		          category_id: cardPaymentCategoryId,
+		          account_id: m.withdrawAccountId,
+		          to_account_id: card.id,
+		          date: dueDate,
+		          memo,
+		        });
+		        memoSet.add(memo);
+		        createdAny = true;
+		      }
+		      if (createdAny) await refreshTransactions();
+		    };
+
+    run().catch(() => {}).finally(() => {
+      autopayInFlightRef.current = false;
+    });
+  }, [accounts, authReady, formatLocalISO, isLoggedIn, month, monthDataReady, refreshTransactions, transactions, userProfile?.id]);
 
   const refreshBudgets = useCallback(async () => {
     const bds = await budgetsApi.list();
@@ -221,7 +377,9 @@ const App: React.FC = () => {
   };
 
   // Nav Item Component
-  const NavItem = ({ viewKey, label, iconPath, badge, active }: any) => (
+  type NavItemBadge = { text: string; style?: React.CSSProperties };
+  type NavItemProps = { viewKey?: View; label: string; iconPath: string; badge?: NavItemBadge; active?: boolean };
+  const NavItem: React.FC<NavItemProps> = ({ viewKey, label, iconPath, badge, active }) => (
     <button 
       className={`nav-item ${active ? 'active' : ''}`} 
       onClick={() => viewKey ? setView(viewKey) : showAlert('준비 중인 기능입니다.')}
@@ -246,6 +404,84 @@ const App: React.FC = () => {
   if (!authReady) return <div className="app-root" style={{background:'#050505'}} />;
   if (!isLoggedIn) return <AuthTest />;
   if (loading) return <div className="app-root" style={{background:'#050505'}} />;
+
+  const alarmItems = (() => {
+    const today = new Date();
+    const todayISO = formatLocalISO(today);
+    const currentMonth = todayISO.slice(0, 7);
+    const diffs = new Set([0, 1, 3]);
+
+    const diffDays = (iso: string) => {
+      const a = new Date(`${todayISO}T00:00:00Z`).getTime();
+      const b = new Date(`${iso}T00:00:00Z`).getTime();
+      return Math.round((b - a) / 86400000);
+    };
+
+    const meta = loadAccountMeta();
+    const out: Array<{ kind: 'bill' | 'loan' | 'budget' | 'card'; title: string; when?: string; badge?: string }> = [];
+
+    // Bills D-3/D-1/D0
+    for (const b of loadBills()) {
+      const due = dueDateForMonth(b, currentMonth);
+      if (!due) continue;
+      const d = diffDays(due);
+      if (d < 0) continue;
+      if (!diffs.has(d)) continue;
+      out.push({
+        kind: 'bill',
+        title: `[고정지출] ${b.name}`,
+        when: due,
+        badge: d === 0 ? 'D-DAY' : `D-${d}`,
+      });
+    }
+
+    // Loans D-3/D-1/D0
+    for (const l of loans) {
+      if (!l.next_due_date) continue;
+      const due = l.next_due_date.slice(0, 10);
+      const d = diffDays(due);
+      if (d < 0) continue;
+      if (!diffs.has(d)) continue;
+      out.push({
+        kind: 'loan',
+        title: `[대출] ${l.name}`,
+        when: due,
+        badge: d === 0 ? 'D-DAY' : `D-${d}`,
+      });
+    }
+
+    // Credit card payments D-3/D-1/D0
+    for (const a of accounts) {
+      const m = meta[a.id];
+      if (!m || m.kind !== 'credit_card') continue;
+      const due = isoInMonth(currentMonth, Number(m.paymentDay) || 1);
+      const d = diffDays(due);
+      if (d < 0) continue;
+      if (!diffs.has(d)) continue;
+      const cycle = creditCardCycleRange(currentMonth, m);
+      const amount = transactions
+        .filter((t) => t.type === 'expense' && t.account_id === a.id && t.date >= cycle.start && t.date <= cycle.end)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+      if (amount <= 0) continue;
+      out.push({
+        kind: 'card',
+        title: `[카드대금] ${a.name}`,
+        when: due,
+        badge: d === 0 ? 'D-DAY' : `D-${d}`,
+      });
+    }
+
+    // Budget 80%
+    if (stats && stats.month === currentMonth) {
+      const totalBudget = stats.budgetUsage.reduce((sum, b) => sum + (b.budget_amount || 0), 0);
+      const totalSpent = stats.budgetUsage.reduce((sum, b) => sum + (b.spent || 0), 0);
+      if (totalBudget > 0 && totalSpent / totalBudget >= 0.8) {
+        out.push({ kind: 'budget', title: '[예산] 사용률 80% 도달' });
+      }
+    }
+
+    return out.slice(0, 20);
+  })();
 
   return (
     <>
@@ -316,7 +552,7 @@ const App: React.FC = () => {
                 <div className="header-subtitle">{getPageSubtitle(view)}</div>
               </div>
               
-              <div className="header-right">
+	              <div className="header-right">
                 <button className="icon-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
                   {theme === 'dark' ? 
                     <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-12-12A8,8,0,0,0,46.34,58.34ZM197.66,58.34a8,8,0,0,0,11.31-11.32l-12-12a8,8,0,0,0-11.31,11.32ZM224,120H248a8,8,0,0,0,0-16H224a8,8,0,0,0,0,16ZM48,120H24a8,8,0,0,0,0,16H48a8,8,0,0,0,0-16ZM197.66,197.66a8,8,0,0,0-11.31,11.31l12,12a8,8,0,0,0,11.31-11.31ZM58.34,186.34l-12,12a8,8,0,0,0,11.32,11.32l12-12a8,8,0,0,0-11.32-11.32ZM120,216v24a8,8,0,0,0,16,0V216a8,8,0,0,0-16,0Z"/></svg> 
@@ -324,12 +560,12 @@ const App: React.FC = () => {
                     <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M216.24,137.11a8,8,0,0,1-3.66,6.88,119.76,119.76,0,0,1-112.53,17.9,119.72,119.72,0,0,1-56.16-56.33A119.76,119.76,0,0,1,61.79,7.56a8,8,0,0,1,10.78-4.07,8,8,0,0,1,4.07,10.78,104,104,0,0,0,136.14,136.14,8,8,0,0,1,10.78,4.07A8,8,0,0,1,216.24,137.11Z"/></svg>
                   }
                 </button>
-                <button className="icon-btn">
-                  <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.9,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>
-                  <div className="notif-dot" />
-                </button>
-              </div>
-            </header>
+	                <button className="icon-btn" onClick={() => setShowAlarm(true)} aria-label="Notifications">
+	                  <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.9,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>
+	                  {alarmItems.length > 0 && <div className="notif-dot" />}
+	                </button>
+	              </div>
+	            </header>
 
             <div className="main-scroll">
               {view === 'dashboard' && (
@@ -357,17 +593,50 @@ const App: React.FC = () => {
                   currency={currency}
                   month={month}
                   accounts={accounts}
-                  categories={categories}
                   onRefreshCategories={refreshCategories}
+                  transactions={transactions}
+                  onRefreshTransactions={refreshTransactions}
                 />
               )}
               {view === 'savings' && <SavingsView goals={savingsGoals} currency={currency} onRefresh={refreshGoals} />}
             </div>
           </div>
         </div>
-      </div>
-    </>
-  );
+	      </div>
+	      {showAlarm && (
+	        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowAlarm(false)}>
+	          <div className="modal-content" style={{ maxWidth: 560 }}>
+	            <div className="modal-header">
+	              <h3 className="modal-title">Alerts</h3>
+	              <button className="modal-close" onClick={() => setShowAlarm(false)}>
+	                <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor">
+	                  <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/>
+	                </svg>
+	              </button>
+	            </div>
+	            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+	              {alarmItems.map((a, idx) => (
+	                <LiquidPanel key={`${a.kind}-${idx}`} className="interactive" style={{ cursor: 'default' }}>
+	                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+	                    <div style={{ minWidth: 0 }}>
+	                      <div style={{ fontWeight: 750, color: 'var(--text-primary)' }}>{a.title}</div>
+	                      {a.when && <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-muted)' }}>{a.when}</div>}
+	                    </div>
+	                    {a.badge && (
+	                      <div style={{ padding: '6px 10px', borderRadius: 999, border: '1px solid var(--stroke)', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontWeight: 750, fontSize: 12 }}>
+	                        {a.badge}
+	                      </div>
+	                    )}
+	                  </div>
+	                </LiquidPanel>
+	              ))}
+	              {alarmItems.length === 0 && <div style={{ padding: 12, color: 'var(--text-muted)' }}>No alerts</div>}
+	            </div>
+	          </div>
+	        </div>
+	      )}
+	    </>
+	  );
 };
 
 export default App;

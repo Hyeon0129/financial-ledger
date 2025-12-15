@@ -67,6 +67,7 @@ export interface Transaction {
   to_account_id: string | null;
   date: string;
   memo: string | null;
+  memo_raw?: string | null; // client-only: original memo from DB for dedupe
   created_at: string;
   // Joined fields
   category_name?: string;
@@ -522,6 +523,22 @@ const parseAutoLoanMemo = (memo: string | null | undefined): ParsedAutoLoanMemo 
   };
 };
 
+type ParsedAutoBillMemo = { billId: string; dueDate: string };
+const parseAutoBillMemo = (memo: string | null | undefined): ParsedAutoBillMemo | null => {
+  if (!memo || !memo.startsWith('AUTO_BILL|')) return null;
+  const [, billId, dueDate] = memo.split('|');
+  if (!billId || !dueDate) return null;
+  return { billId, dueDate };
+};
+
+type ParsedAutoCardMemo = { accountId: string; month: string; dueDate: string };
+const parseAutoCardMemo = (memo: string | null | undefined): ParsedAutoCardMemo | null => {
+  if (!memo || !memo.startsWith('AUTO_CARD|')) return null;
+  const [, accountId, month, dueDate] = memo.split('|');
+  if (!accountId || !month || !dueDate) return null;
+  return { accountId, month, dueDate };
+};
+
 type ParsedSettleLoanMemo = {
   loanId: string;
   settledDate: string;
@@ -672,9 +689,10 @@ export const transactionsApi = {
     return txs.map(t => {
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       const acc = t.account_id ? accMap.get(t.account_id) : undefined;
-      let memo = t.memo ?? null;
+      const memoRaw = t.memo ?? null;
+      let memo = memoRaw;
 
-      const autoMemo = parseAutoLoanMemo(memo);
+      const autoMemo = parseAutoLoanMemo(memoRaw);
       if (autoMemo) {
         const loanInfo = loanMap.get(autoMemo.loanId);
         const loanLabel = loanInfo?.name ?? '대출';
@@ -684,12 +702,25 @@ export const transactionsApi = {
             : `${autoMemo.installment}회차`;
         memo = `[ ${loanLabel} ] ${installmentText}`;
       } else {
-        const settleMemo = parseSettleLoanMemo(memo);
+        const settleMemo = parseSettleLoanMemo(memoRaw);
         if (settleMemo) {
           const loanInfo = loanMap.get(settleMemo.loanId);
           const loanLabel = loanInfo?.name ?? '대출';
           memo = `${loanLabel} 상환 완료`;
         }
+      }
+
+      const autoBill = parseAutoBillMemo(memoRaw);
+      if (autoBill) {
+        const parent = cat?.parent_id ? catMap.get(cat.parent_id) : undefined;
+        const groupLabel = parent?.name ?? '고정지출';
+        memo = `[고정지출] ${groupLabel}`;
+      }
+
+      const autoCard = parseAutoCardMemo(memoRaw);
+      if (autoCard) {
+        const cardAcc = accMap.get(autoCard.accountId);
+        memo = `[카드대금] ${cardAcc?.name ?? '신용카드'}`;
       }
 
       return {
@@ -699,6 +730,7 @@ export const transactionsApi = {
         category_color: cat?.color,
         account_name: acc?.name,
         memo,
+        memo_raw: memoRaw,
       };
     });
   },
@@ -817,7 +849,10 @@ export const budgetsApi = {
 
     const res = await supabase
       .from('budgets')
-      .insert({ user_id: user.id, category_id: data.category_id, amount: toIntMoney(data.amount), month })
+      .upsert(
+        { user_id: user.id, category_id: data.category_id, amount: toIntMoney(data.amount), month },
+        { onConflict: 'user_id,category_id,month' },
+      )
       .select('*')
       .single();
 

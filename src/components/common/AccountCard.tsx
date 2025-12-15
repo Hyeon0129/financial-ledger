@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatCurrency } from '../../api';
 import type { Account } from '../../api';
+import { formatAccountDisplayName, inferKindFallback, loadAccountMeta } from '../views/accountMetaStore';
 
 interface AccountCardProps {
   account: Account;
@@ -34,18 +35,22 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   monthlySpend,
   userEmail,
 }) => {
+  const meta = loadAccountMeta();
+  const kind = meta[account.id]?.kind ?? inferKindFallback(account.type);
+  const cardMeta = kind === 'credit_card' && meta[account.id]?.kind === 'credit_card' ? meta[account.id] : null;
   const preset = getPresetByIndex(index);
   const icon = getIconByName(account.name || '');
   const remaining = Number(account.balance) || 0;
   const spent = Number(monthlySpend) || 0;
   const holder = (userEmail || '-').split('@')[0] || '-';
+  const creditLimit = cardMeta && cardMeta.kind === 'credit_card' ? Number(cardMeta.creditLimit) || 0 : 0;
 
   return (
     <div className={`bank-card ${preset} ${className || ''}`} role="button" tabIndex={0}>
       <div className="card-top">
         <div className="bank-logo">
           <i className={`ph ${icon}`} />
-          <span className="bank-name">{account.name}</span>
+          <span className="bank-name">{formatAccountDisplayName(account.name, kind)}</span>
         </div>
         <img
           className="bank-chip"
@@ -64,8 +69,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         </div>
 
         <div className="card-block">
-          <div className="card-label">Remaining</div>
-          <div className="card-val">{formatCurrency(remaining, currency)}</div>
+          <div className="card-label">{kind === 'credit_card' ? 'Limit' : 'Remaining'}</div>
+          <div className="card-val">
+            {formatCurrency(kind === 'credit_card' ? creditLimit : remaining, currency)}
+          </div>
         </div>
         <div className="card-block">
           <div className="card-label">This month spent</div>

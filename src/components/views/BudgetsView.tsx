@@ -17,7 +17,7 @@ interface BudgetsViewProps {
 }
 
 export const BudgetsView: React.FC<BudgetsViewProps> = ({ 
-  budgets, categories, stats, currency, transactions, onRefresh 
+  budgets, categories, stats, currency, month, transactions, onRefresh 
 }) => {
   const expenseCategories = useMemo(() => 
     categories.filter((c) => c.type === 'expense'),
@@ -65,6 +65,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
       await budgetsApi.create({
         category_id: categoryId,
         amount: value,
+        month,
       });
       setShowModal(false);
       await onRefresh();
@@ -272,6 +273,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                   className="form-select"
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
+                  disabled={!!editingBudget}
                 >
                   {categories
                     .filter((p) => p.type === 'expense' && !p.parent_id)

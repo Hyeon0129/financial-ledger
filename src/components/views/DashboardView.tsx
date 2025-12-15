@@ -16,6 +16,7 @@ import { formatCurrency, formatDate, formatDateShort } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
 import type { View } from '../common/utils';
 import { deriveBill, dueDateForMonth, loadBills } from './billsStore';
+import { creditCardCycleRange, isoInMonth, loadAccountMeta } from './accountMetaStore';
 
 interface DashboardViewProps {
   stats: MonthlyStats | null;
@@ -38,6 +39,21 @@ function getDelta(curr: number, prev: number) {
   const diff = curr - prev;
   return { val: diff, pct: (diff / prev) * 100 };
 }
+
+type BillsPreviewStatus = 'paid' | 'scheduled';
+type BillsPreviewGroupKey = 'subscription' | 'living' | 'utility' | 'custom' | 'card';
+type BillsPreviewItem = {
+  id: string;
+  name: string;
+  dueDate: string;
+  amount: number;
+  status: BillsPreviewStatus;
+  statusLabel: 'Paid' | 'Scheduled';
+  group: BillsPreviewGroupKey;
+  groupLabel?: string | null;
+};
+
+type BillsPreviewGroup = { groupKey: BillsPreviewGroupKey; groupTitle: string; items: BillsPreviewItem[] };
 
 const TrendPill: React.FC<{ dir: TrendDir; pct: number }> = ({ dir, pct }) => (
   <span className={`trend ${dir}`}>
@@ -71,6 +87,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
   accounts,
   budgets,
+  categories,
   yearlyStats,
   currency,
   month,
@@ -85,25 +102,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const expenseDelta = getDelta(expense, prevStats?.expense ?? 0);
   const balanceDelta = getDelta(balance, prevStats?.balance ?? 0);
 
-  const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
-  const budgetProgress = totalBudget > 0 ? (expense / totalBudget) * 100 : 0;
-  const budgetRemaining = Math.max(0, totalBudget - expense);
+  const hasBudgetUsage = (stats?.budgetUsage?.length ?? 0) > 0;
+  const budgetUsageTotal = (stats?.budgetUsage ?? []).reduce((sum, b) => sum + (b.budget_amount ?? 0), 0);
+  const budgetUsageSpent = (stats?.budgetUsage ?? []).reduce((sum, b) => sum + (b.spent ?? 0), 0);
+
+  const totalBudget = hasBudgetUsage
+    ? budgetUsageTotal
+    : budgets.filter((b) => b.month === month).reduce((sum, b) => sum + b.amount, 0);
+  const budgetSpent = hasBudgetUsage ? budgetUsageSpent : expense;
+  const budgetProgress = totalBudget > 0 ? (budgetSpent / totalBudget) * 100 : 0;
+  const budgetRemaining = Math.max(0, totalBudget - budgetSpent);
 
   const totalAssets = useMemo(() => accounts.reduce((sum, acc) => sum + (acc.balance ?? 0), 0), [accounts]);
 
   const categoryData = useMemo(() => {
     if (!stats?.byCategory) return [];
-    const items = stats.byCategory
-      .filter((c) => c.total > 0 && c.type === 'expense')
-      .sort((a, b) => b.total - a.total);
-    const total = items.reduce((sum, c) => sum + c.total, 0) || 1;
+    const catMap = new Map(categories.map((c) => [c.id, c]));
+    const rootOf = (id: string): Category | null => {
+      let cur = catMap.get(id) ?? null;
+      let guard = 0;
+      while (cur?.parent_id && guard < 20) {
+        const next = catMap.get(cur.parent_id);
+        if (!next) break;
+        cur = next;
+        guard += 1;
+      }
+      return cur;
+    };
+
+    const totals = new Map<string, { name: string; color: string; value: number }>();
+    for (const row of stats.byCategory) {
+      if (row.type !== 'expense') continue;
+      if (!row.total || row.total <= 0) continue;
+      if (!row.category_id || row.category_id === 'uncat') continue;
+      const root = rootOf(row.category_id);
+      const key = root?.id ?? row.category_id;
+      const name = root?.name ?? row.category_name;
+      const color = root?.color ?? row.category_color ?? 'var(--accent-orange)';
+      const cur = totals.get(key) ?? { name, color, value: 0 };
+      cur.value += row.total;
+      totals.set(key, cur);
+    }
+
+    const items = Array.from(totals.values()).sort((a, b) => b.value - a.value);
+    const total = items.reduce((sum, c) => sum + c.value, 0) || 1;
     return items.slice(0, 12).map((c) => ({
-      name: c.category_name,
-      value: c.total,
-      pct: (c.total / total) * 100,
-      color: c.category_color || 'var(--accent-orange)',
+      name: c.name,
+      value: c.value,
+      pct: (c.value / total) * 100,
+      color: c.color || 'var(--accent-orange)',
     }));
-  }, [stats]);
+  }, [categories, stats]);
 
   const largestCategoryPct = categoryData[0]?.pct ?? 0;
 
@@ -264,14 +313,119 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     recentPageSafe * recentPageSize,
   );
 
-  const bills = useMemo(() => {
+  const billsPreview = useMemo((): BillsPreviewGroup[] => {
     const recurring = loadBills();
-    const active = recurring
+    const txMemoSet = new Set(transactions.map((t) => (t.memo_raw ?? t.memo ?? '')));
+
+    const formatLocalISO = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const addDaysISO = (iso: string, days: number) => {
+      const [yy, mm, dd] = iso.split('-').map(Number);
+      const base = new Date(Date.UTC(yy, mm - 1, dd));
+      base.setUTCDate(base.getUTCDate() + days);
+      return base.toISOString().slice(0, 10);
+    };
+
+    const todayISO = formatLocalISO(new Date());
+    const dayMinus1 = addDaysISO(todayISO, -1);
+    const dayMinus2 = addDaysISO(todayISO, -2);
+    const nowMonth = todayISO.slice(0, 7);
+
+    const showPaid = (dueDate: string) => dueDate === todayISO || dueDate === dayMinus1 || dueDate === dayMinus2;
+
+    const billItems: BillsPreviewItem[] = recurring
       .filter((b) => !!dueDateForMonth(b, month))
-      .map((b) => deriveBill(b, month, accounts))
+      .map((b) => {
+        const base = deriveBill(b, month, accounts);
+        const memo = base.id && base.dueDate ? `AUTO_BILL|${base.id}|${base.dueDate}` : '';
+        const paidByTx = memo && txMemoSet.has(memo);
+        const status: BillsPreviewStatus = paidByTx || base.status === 'paid' ? 'paid' : 'scheduled';
+        return {
+          id: base.id,
+          name: base.name,
+          dueDate: base.dueDate,
+          amount: base.amount,
+          status,
+          statusLabel: (status === 'paid' ? 'Paid' : 'Scheduled') as 'Paid' | 'Scheduled',
+          group: base.group as BillsPreviewGroupKey,
+          groupLabel: base.groupLabel ?? null,
+        };
+      })
       .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
-    return active.slice(0, 1);
-  }, [accounts, month]);
+
+    const meta = loadAccountMeta();
+
+    const cardItems: BillsPreviewItem[] = accounts
+      .map((a) => {
+        const m = meta[a.id];
+        if (!m || m.kind !== 'credit_card') return null;
+        const dueDate = isoInMonth(month, Number(m.paymentDay) || 1);
+        const cycle = creditCardCycleRange(month, m);
+        const amount = transactions
+          .filter((t) => t.type === 'expense' && t.account_id === a.id && t.date >= cycle.start && t.date <= cycle.end)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        if (amount <= 0) return null;
+        const memo = `AUTO_CARD|${a.id}|${month}|${dueDate}`;
+        const paidByTx = txMemoSet.has(memo);
+        const status: BillsPreviewStatus =
+          paidByTx
+            ? 'paid'
+            : month < nowMonth
+              ? 'paid'
+              : month > nowMonth
+                ? 'scheduled'
+                : todayISO < dueDate
+                  ? 'scheduled'
+                  : 'paid';
+        return {
+          id: `card:${a.id}`,
+          name: a.name,
+          dueDate,
+          amount,
+          status,
+          statusLabel: (status === 'paid' ? 'Paid' : 'Scheduled') as 'Paid' | 'Scheduled',
+          group: 'card',
+          groupLabel: null,
+        };
+      })
+      .filter(Boolean) as BillsPreviewItem[];
+
+    const allItems = [...billItems, ...cardItems];
+    const candidates = allItems.filter((b) => b.status !== 'paid' || showPaid(b.dueDate));
+
+    const groupOrder: BillsPreviewGroupKey[] = ['living', 'utility', 'subscription', 'custom', 'card'];
+    const groupTitle = (g: BillsPreviewGroupKey, customLabel?: string | null) => {
+      if (g === 'subscription') return '구독';
+      if (g === 'living') return '생활비';
+      if (g === 'utility') return '공과금';
+      if (g === 'card') return '카드대금';
+      return customLabel?.trim() || '기타';
+    };
+
+    const byGroup = new Map<BillsPreviewGroupKey, BillsPreviewItem[]>();
+    for (const g of groupOrder) byGroup.set(g, []);
+    for (const b of candidates) {
+      byGroup.get(b.group)?.push(b);
+    }
+
+    const maxTotal = 12;
+    const maxPerGroup = 4;
+    const selected: BillsPreviewGroup[] = [];
+    let remaining = maxTotal;
+    for (const g of groupOrder) {
+      if (remaining <= 0) break;
+      const items = (byGroup.get(g) ?? []).slice(0, Math.min(maxPerGroup, remaining));
+      if (items.length === 0) continue;
+      selected.push({ groupKey: g, groupTitle: groupTitle(g, items[0]?.groupLabel), items });
+      remaining -= items.length;
+    }
+
+    return selected;
+  }, [accounts, month, transactions]);
   const netChange = income - expense;
   const prevNetChange = (prevStats?.income ?? 0) - (prevStats?.expense ?? 0);
   const netChangeDelta = getDelta(netChange, prevNetChange);
@@ -467,10 +621,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="dash-donutWrap">
               <div className="dash-donutChart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
+	                <ResponsiveContainer width="100%" height="100%">
+	                  <PieChart>
+	                    <Pie
+	                      data={categoryData}
                       dataKey="value"
                       nameKey="name"
                       innerRadius="70%"
@@ -479,12 +633,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       stroke="rgba(255,255,255,0.10)"
                       strokeWidth={1}
                     >
-                      {categoryData.map((entry, idx) => (
-                        <Cell key={idx} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+	                      {categoryData.map((entry, idx) => (
+	                        <Cell key={idx} fill={entry.color} />
+	                      ))}
+	                    </Pie>
+	                    <Tooltip
+	                      cursor={false}
+	                      content={({ active, payload }) => {
+	                        const p = payload?.[0]?.payload as { name?: string; value?: number; pct?: number } | undefined;
+	                        if (!active || !p) return null;
+	                        return (
+	                          <div
+	                            style={{
+	                              background: 'rgba(10, 12, 16, 0.92)',
+	                              border: '1px solid rgba(255,255,255,0.12)',
+	                              borderRadius: 14,
+	                              boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
+	                              padding: '10px 12px',
+	                              color: 'rgba(255,255,255,0.92)',
+	                              fontSize: 12,
+	                              fontWeight: 750,
+	                            }}
+	                          >
+	                            <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.80)', fontWeight: 800 }}>
+	                              {p.name ?? '-'}
+	                            </div>
+	                            <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+	                              <span>{formatCurrency(Number(p.value) || 0, currency)}</span>
+	                              <span style={{ color: 'rgba(255,255,255,0.66)', fontWeight: 750 }}>
+	                                {(Number(p.pct) || 0).toFixed(0)}%
+	                              </span>
+	                            </div>
+	                          </div>
+	                        );
+	                      }}
+	                    />
+	                  </PieChart>
+	                </ResponsiveContainer>
                 <div className="dash-donutCenter">
                   <div className="dash-donutPct">{largestCategoryPct.toFixed(0)}%</div>
                   <div className="dash-donutLabel">top category</div>
@@ -508,31 +693,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <LiquidPanel className="interactive dash-billsPanel">
         <div className="dash-billsHeader">
           <div className="dash-subTitle">Bill &amp; Payment</div>
-          <button className="dash-billAdd" type="button" onClick={() => onNavigate('bills')}>
-            <i className="ph ph-plus" />
+          <button className="dash-linkBtn" type="button" onClick={() => onNavigate('bills')}>
+            View All
           </button>
         </div>
 
         <div className="dash-billsBody">
-          {bills.map((b) => (
-            <div key={b.id} className="dash-billCard">
-              <div className="dash-billTop">
-                <div className="dash-billIcon">{b.name[0] ?? 'B'}</div>
-                <div className="dash-billMeta">
-                  <div className="dash-billName">{b.name}</div>
-                  <div className="dash-billDate">{formatDateShort(b.dueDate)}</div>
-                </div>
-                <div className={`dash-billStatus ${b.status}`}>{b.statusLabel}</div>
+          {billsPreview.map((g) => (
+            <div key={g.groupKey} className="dash-billGroup">
+              <div className="dash-billGroupTitle">{g.groupTitle}</div>
+              <div className="dash-billRows">
+                {g.items.map((b) => (
+                  <div key={b.id} className="dash-billItem">
+                    <div className="dash-billItemName">{b.name}</div>
+                    <div className="dash-billItemDue">{formatDateShort(b.dueDate)}</div>
+                    <div className="dash-billItemAmount">{formatCurrency(b.amount, currency)}</div>
+                    <div className={`dash-billItemStatus ${b.status}`}>{b.statusLabel}</div>
+                  </div>
+                ))}
               </div>
-              <div className="dash-billAmount">{formatCurrency(b.amount, currency)}</div>
             </div>
           ))}
-          {bills.length === 0 && <div className="dash-empty">No bills</div>}
+          {billsPreview.length === 0 && <div className="dash-empty">No bills</div>}
         </div>
-
-        <button className="dash-billsViewAll" type="button" onClick={() => onNavigate('bills')}>
-          View All
-        </button>
       </LiquidPanel>
     </div>
   );

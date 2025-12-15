@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import type { Account, Category } from '../../api';
-import { categoriesApi, formatCurrency, formatDateShort, getMonthKey } from '../../api';
+import type { Account, Category, Transaction } from '../../api';
+import { categoriesApi, formatCurrency, formatDateShort, getMonthKey, transactionsApi } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
 import { Icons } from '../common/Icons';
 import { showAlert, showConfirm } from '../common/alertHelpers';
@@ -11,8 +11,9 @@ type BillsViewProps = {
   currency: string;
   month: string; // selected month (YYYY-MM)
   accounts: Account[];
-  categories: Category[];
   onRefreshCategories: () => void;
+  transactions: Transaction[];
+  onRefreshTransactions: () => Promise<void>;
 };
 
 const groupDisplay = (g: BillCategoryGroup) => {
@@ -22,13 +23,6 @@ const groupDisplay = (g: BillCategoryGroup) => {
   return '기타';
 };
 
-const cadenceDisplay = (c: BillCadence) => {
-  if (c === 'weekly') return '매주';
-  if (c === 'monthly') return '매월';
-  if (c === 'yearly') return '매년';
-  return '사용자 지정';
-};
-
 const groupColor = (g: BillCategoryGroup) => {
   if (g === 'living') return '#22C55E';
   if (g === 'utility') return '#38BDF8';
@@ -36,21 +30,63 @@ const groupColor = (g: BillCategoryGroup) => {
   return '#94A3B8';
 };
 
-export const BillsView: React.FC<BillsViewProps> = ({ currency, month, accounts, categories, onRefreshCategories }) => {
+export const BillsView: React.FC<BillsViewProps> = ({
+  currency,
+  month,
+  accounts,
+  onRefreshCategories,
+  transactions,
+  onRefreshTransactions,
+}) => {
+  const formatLocalISO = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const [items, setItems] = useState<RecurringBill[]>(() => loadBills());
   const [editing, setEditing] = useState<RecurringBill | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const derived = useMemo(() => {
+    const txMemoSet = new Set(transactions.map((t) => (t.memo_raw ?? t.memo ?? '')));
+
     return items
       .filter((b) => !!dueDateForMonth(b, month))
-      .map((b) => deriveBill(b, month, accounts))
+      .map((b) => {
+        const base = deriveBill(b, month, accounts);
+        const memo = base.id && base.dueDate ? `AUTO_BILL|${base.id}|${base.dueDate}` : '';
+        const paidByTx = memo && txMemoSet.has(memo);
+
+        if (paidByTx) {
+          return { ...base, status: 'paid' as const, statusLabel: 'Paid' };
+        }
+
+        return base;
+      })
       .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
-  }, [accounts, items, month]);
+  }, [accounts, items, month, transactions]);
+
+  const groupedTables = useMemo(() => {
+    const order: BillCategoryGroup[] = ['living', 'utility', 'subscription', 'custom'];
+    const groups = new Map<BillCategoryGroup, BillItem[]>();
+    for (const k of order) groups.set(k, []);
+    for (const b of derived) {
+      const list = groups.get(b.group) ?? [];
+      list.push(b);
+      groups.set(b.group, list);
+    }
+    return order.map((g) => ({
+      group: g,
+      title: groupDisplay(g),
+      items: groups.get(g) ?? [],
+    }));
+  }, [derived]);
 
   const openNew = () => {
     const today = new Date();
-    const defaultDate = month === getMonthKey(today) ? today.toISOString().slice(0, 10) : `${month}-01`;
+    const defaultDate = month === getMonthKey(today) ? formatLocalISO(today) : `${month}-01`;
     setEditing({
       id: '',
       name: '',
@@ -100,8 +136,8 @@ export const BillsView: React.FC<BillsViewProps> = ({ currency, month, accounts,
     }
   };
 
-  const ensureParentCategory = async (label: string, group: BillCategoryGroup) => {
-    const existing = categories.find((c) => c.type === 'expense' && !c.parent_id && c.name === label);
+  const ensureParentCategory = async (label: string, group: BillCategoryGroup, cats: Category[]) => {
+    const existing = cats.find((c) => c.type === 'expense' && !c.parent_id && c.name === label);
     if (existing) return existing;
     return categoriesApi.create({
       name: label,
@@ -112,20 +148,61 @@ export const BillsView: React.FC<BillsViewProps> = ({ currency, month, accounts,
     });
   };
 
+  const autoMemo = (billId: string, dueDate: string) => `AUTO_BILL|${billId}|${dueDate}`;
+
+  const dueDatesForAutopay = (bill: RecurringBill, monthKey: string, maxISO: string) => {
+    const first = dueDateForMonth(bill, monthKey);
+    if (!first) return [];
+    if (bill.cadence === 'monthly' || bill.cadence === 'yearly') {
+      return first <= maxISO ? [first] : [];
+    }
+    const step =
+      bill.cadence === 'weekly' ? 7 : Math.max(1, Math.floor(bill.customEveryDays ?? 0));
+    if (bill.cadence === 'custom_days' && (!Number.isFinite(step) || step <= 0)) return [];
+
+    const monthEnd = `${monthKey}-${String(new Date(Number(monthKey.split('-')[0]), Number(monthKey.split('-')[1]), 0).getDate()).padStart(2, '0')}`;
+    const limit = maxISO < monthEnd ? maxISO : monthEnd;
+
+    const out: string[] = [];
+    let cursor = first;
+    let guard = 0;
+    while (cursor <= limit && guard < 4000) {
+      out.push(cursor);
+      const d = new Date(`${cursor}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + step);
+      cursor = d.toISOString().slice(0, 10);
+      guard += 1;
+    }
+    return out;
+  };
+
   const upsert = async (nextItem: RecurringBill) => {
     const finalItem: RecurringBill = nextItem.id ? nextItem : { ...nextItem, id: newBillId() };
+    const nameKey = finalItem.name.trim().toLowerCase();
+    const dup = items.find((b) => b.id !== finalItem.id && b.name.trim().toLowerCase() === nameKey);
+    if (dup) {
+      showAlert('같은 이름의 고정지출이 이미 있습니다.');
+      return;
+    }
 
     // Ensure (parent -> child) categories for expense leaf selection.
     try {
+      const latestCats = await categoriesApi.list();
       const parentLabel = billGroupLabel(finalItem);
-      const parent = await ensureParentCategory(parentLabel, finalItem.group);
+      const parent = await ensureParentCategory(parentLabel, finalItem.group, latestCats);
 
-      if (finalItem.categoryId) {
-        // Update existing leaf category to follow name/parent changes.
-        await categoriesApi.update(finalItem.categoryId, {
+      const sameNameLeaf = latestCats.find(
+        (c) => c.type === 'expense' && !!c.parent_id && c.name.toLowerCase() === finalItem.name.toLowerCase(),
+      );
+
+      if (finalItem.categoryId || sameNameLeaf) {
+        const targetId = finalItem.categoryId ?? sameNameLeaf?.id ?? '';
+        finalItem.categoryId = targetId;
+        await categoriesApi.update(targetId, {
           name: finalItem.name,
           type: 'expense',
           parent_id: parent.id,
+          color: groupColor(finalItem.group),
         });
       } else {
         const created = await categoriesApi.create({
@@ -145,6 +222,42 @@ export const BillsView: React.FC<BillsViewProps> = ({ currency, month, accounts,
     const next = nextItem.id ? items.map((b) => (b.id === finalItem.id ? finalItem : b)) : [finalItem, ...items];
     setItems(next);
     saveBills(next);
+
+    // Auto-create transactions for past-due occurrences in the current month.
+    try {
+      if (!finalItem.categoryId || !finalItem.accountId) return;
+      const todayISO = formatLocalISO(new Date());
+      const currentMonth = todayISO.slice(0, 7);
+      const dueDates = dueDatesForAutopay(finalItem, currentMonth, todayISO);
+      if (dueDates.length === 0) return;
+
+      const existing = new Set(
+        transactions
+          .filter((t) => (t.memo_raw ?? t.memo)?.startsWith(`AUTO_BILL|${finalItem.id}|`))
+          .map((t) => (t.memo_raw ?? t.memo) as string),
+      );
+
+      let createdAny = false;
+      for (const dueDate of dueDates) {
+        const memo = autoMemo(finalItem.id, dueDate);
+        if (existing.has(memo)) continue;
+        await transactionsApi.create({
+          type: 'expense',
+          amount: finalItem.amount,
+          category_id: finalItem.categoryId,
+          account_id: finalItem.accountId,
+          to_account_id: null,
+          date: dueDate,
+          memo,
+        });
+        createdAny = true;
+      }
+      if (createdAny) {
+        await onRefreshTransactions();
+      }
+    } catch {
+      // do not block bill save flow
+    }
   };
 
   return (
@@ -156,41 +269,51 @@ export const BillsView: React.FC<BillsViewProps> = ({ currency, month, accounts,
         </button>
       </div>
 
-      <div className="bills-grid">
-        {derived.map((b) => (
-          <LiquidPanel key={b.id} className="interactive bill-card" onClick={() => openEdit(b)}>
-            <div className="bill-card-top">
-              <div className="bill-card-icon">{b.name[0] ?? 'B'}</div>
-              <div className="bill-card-meta">
-                <div className="bill-card-name">{b.name}</div>
-                <div className="bill-card-date">
-                  {formatDateShort(b.dueDate)} • {cadenceDisplay(b.cadence)} • {groupDisplay(b.group)} • {b.accountName || '계좌 미지정'}
-                </div>
-              </div>
-              <div className={`bill-card-status ${b.status}`}>{b.statusLabel}</div>
+      <div className="bills-tableGrid">
+        {groupedTables.map((g) => (
+          <LiquidPanel key={g.group} className="bills-tablePanel">
+            <div className="bills-tableHeader">
+              <div className="bills-tableTitle">{g.title}</div>
             </div>
-            <div className="bill-card-bottom">
-              <div className="bill-card-amount">{formatCurrency(b.amount, currency)}</div>
-              <button
-                className="btn btn-icon bill-card-delete"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void remove(b.id);
-                }}
-                aria-label="Delete"
-                title="Delete"
-              >
-                <Icons.Close />
-              </button>
+
+            <div className="bills-tableHead">
+              <div className="bills-col-item">항목</div>
+              <div className="bills-col-date">결제일</div>
+              <div className="bills-col-acc">계좌</div>
+              <div className="bills-col-amt">금액</div>
+              <div className="bills-col-status">상태</div>
+              <div className="bills-col-actions">관리</div>
+            </div>
+
+            <div className="bills-tableBody">
+              {g.items.map((b) => (
+                  <div key={b.id} className="bills-tableRow">
+                    <div className="bills-col-item">
+                      <span className="bills-itemName" title={b.name}>{b.name}</span>
+                      {b.group === 'custom' && b.groupLabel && (
+                        <span className="bills-itemTag">{b.groupLabel}</span>
+                      )}
+                    </div>
+                  <div className="bills-col-date">{formatDateShort(b.dueDate)}</div>
+                  <div className="bills-col-acc">{b.accountName ?? '-'}</div>
+                  <div className="bills-col-amt">{formatCurrency(b.amount, currency)}</div>
+                  <div className="bills-col-status">
+                    <span className={`bill-card-status ${b.status}`}>{b.statusLabel}</span>
+                  </div>
+                  <div className="bills-col-actions">
+                    <button className="btn btn-sm" type="button" onClick={() => openEdit(b)}>
+                      수정
+                    </button>
+                    <button className="btn btn-sm btn-danger" type="button" onClick={() => void remove(b.id)}>
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {g.items.length === 0 && <div className="bills-empty">등록된 항목이 없습니다.</div>}
             </div>
           </LiquidPanel>
         ))}
-        {derived.length === 0 && (
-          <LiquidPanel>
-            <div style={{ padding: 24, color: 'var(--text-muted)' }}>등록된 고정지출이 없습니다.</div>
-          </LiquidPanel>
-        )}
       </div>
 
       {showModal && editing && (

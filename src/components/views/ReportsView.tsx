@@ -1,6 +1,6 @@
 // Reports View (Analytics)
-import React, { useEffect, useMemo, useState } from 'react';
-import type { Budget, MonthlyStats, Transaction } from '../../api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Budget, Category, MonthlyStats, Transaction } from '../../api';
 import { categoriesApi, formatCurrency, statsApi } from '../../api';
 import { supabase } from '../../lib/supabase';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -19,11 +19,14 @@ type YearRow = { month: string; monthNum: string; income: number; expense: numbe
 type YearCategoryRow = { name: string; value: number; pct: number; color: string };
 type TrendDir = 'up' | 'down';
 
-const VerticalLineCursor: React.FC<any> = ({ points, height }) => {
+type CursorPoint = { x: number; y: number };
+type VerticalLineCursorProps = { points?: CursorPoint[]; height?: number };
+
+const VerticalLineCursor: React.FC<VerticalLineCursorProps> = ({ points, height }) => {
   const p = points?.[0];
   if (!p) return null;
   return (
-    <line x1={p.x} y1={0} x2={p.x} y2={height} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+    <line x1={p.x} y1={0} x2={p.x} y2={height ?? 0} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
   );
 };
 
@@ -32,11 +35,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   const [year, setYear] = useState<number>(initialYear);
   const [yearly, setYearly] = useState<YearlyStats | null>(yearlyStats);
   const [prevYearly, setPrevYearly] = useState<YearlyStats | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [yearExpenseByCategory, setYearExpenseByCategory] = useState<YearCategoryRow[]>([]);
   const [yearCatTopPct, setYearCatTopPct] = useState<number>(0);
   const [loadingYear, setLoadingYear] = useState(false);
   const [insightStats, setInsightStats] = useState<MonthlyStats | null>(null);
   const [insightPrevStats, setInsightPrevStats] = useState<MonthlyStats | null>(null);
+  const statsMonth = stats?.month ?? `${year}-01`;
 
   const monthKeys = useMemo(
     () => Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`),
@@ -55,8 +60,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       return { month: label, monthNum: m.split('-')[1], expense: exp, income: inc, net: inc - exp };
     });
   }, [monthKeys, year, yearly?.monthlyTrend]);
-
-  if (!stats) return <div className="loading-spinner" />;
 
   const ytdIncome = yearlyCombined.reduce((sum, m) => sum + m.income, 0);
   const ytdExpense = yearlyCombined.reduce((sum, m) => sum + m.expense, 0);
@@ -107,7 +110,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   };
 
   const getInsightMonthKey = (targetYear: number, y: YearlyStats | null) => {
-    const currentMonthKey = stats.month;
+    const currentMonthKey = statsMonth;
     const currentYear = Number(currentMonthKey.split('-')[0]);
     if (targetYear === currentYear) return currentMonthKey;
 
@@ -136,6 +139,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       ]);
       setYearly(y);
       setPrevYearly(prevY);
+      setCategories(catsRes);
 
       const insightMonthKey = getInsightMonthKey(targetYear, y);
       const insightPrevKey = getPrevMonthKey(insightMonthKey);
@@ -151,12 +155,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         return;
       }
 
-      const catMap = new Map(
-        catsRes.map((c) => [
-          c.id,
-          { name: c.name, color: c.color || '#6B7280', type: c.type as 'income' | 'expense' },
-        ]),
-      );
+      const catMap = new Map(catsRes.map((c) => [c.id, c]));
+      const rootOf = (id: string): Category | null => {
+        let cur = catMap.get(id) ?? null;
+        let guard = 0;
+        while (cur?.parent_id && guard < 20) {
+          const next = catMap.get(cur.parent_id);
+          if (!next) break;
+          cur = next;
+          guard += 1;
+        }
+        return cur;
+      };
 
       const totals = new Map<string, number>();
       const pageSize = 1000;
@@ -177,7 +187,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
 
         for (const t of rows) {
           if (t.type !== 'expense') continue;
-          const key = t.category_id ?? 'uncat';
+          const raw = t.category_id ?? 'uncat';
+          const root = raw === 'uncat' ? null : rootOf(raw);
+          const key = root?.id ?? raw;
           totals.set(key, (totals.get(key) ?? 0) + (Number(t.amount) || 0));
         }
 
@@ -187,7 +199,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
 
       const items = Array.from(totals.entries())
         .map(([categoryId, total]) => {
-          const cat = categoryId !== 'uncat' ? catMap.get(categoryId) : undefined;
+          const cat = categoryId !== 'uncat' ? rootOf(categoryId) : undefined;
           return {
             name: cat?.name ?? (categoryId === 'uncat' ? '미분류' : '알 수 없음'),
             value: total,
@@ -225,9 +237,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   const insightMonthKey = useMemo(
     () => getInsightMonthKey(year, yearly ?? yearlyStats),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [year, yearly, yearlyStats, stats.month],
+    [year, yearly, yearlyStats, statsMonth],
   );
-  const insightThis = insightMonthKey === stats.month ? stats : insightStats;
+  const insightThis = insightMonthKey === statsMonth ? stats : insightStats;
   const insightPrev = insightPrevStats;
 
   const thisIncome = insightThis?.income ?? 0;
@@ -235,7 +247,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   const lastExpense = insightPrev?.expense ?? 0;
   const thisNet = thisIncome - thisExpense;
 
-  const formatSignedCurrency = (val: number) => `${val >= 0 ? '+' : '-'}${formatCurrency(Math.abs(val), currency)}`;
+  const formatSignedCurrency = useCallback(
+    (val: number) => `${val >= 0 ? '+' : '-'}${formatCurrency(Math.abs(val), currency)}`,
+    [currency],
+  );
 
   const budgetTotal = useMemo(
     () => budgets.filter((b) => b.month === insightMonthKey).reduce((sum, b) => sum + (b.amount ?? 0), 0),
@@ -245,12 +260,40 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   const budgetUsedRatePct = budgetTotal > 0 ? ((budgetTotal - budgetLeft) / budgetTotal) * 100 : 0;
 
   const topCategory = useMemo(() => {
-    const rows = (insightThis?.byCategory ?? []).filter((c) => c.type === 'expense' && c.total > 0);
-    const top = rows.sort((a, b) => b.total - a.total)[0];
+    const byCat = insightThis?.byCategory ?? [];
+    if (byCat.length === 0) return { name: '-', amount: 0, sharePct: 0 };
+
+    const catMap = new Map(categories.map((c) => [c.id, c]));
+    const rootOf = (id: string): Category | null => {
+      let cur = catMap.get(id) ?? null;
+      let guard = 0;
+      while (cur?.parent_id && guard < 20) {
+        const next = catMap.get(cur.parent_id);
+        if (!next) break;
+        cur = next;
+        guard += 1;
+      }
+      return cur;
+    };
+
+    const totals = new Map<string, { name: string; total: number }>();
+    for (const row of byCat) {
+      if (row.type !== 'expense') continue;
+      if (!row.total || row.total <= 0) continue;
+      if (!row.category_id || row.category_id === 'uncat') continue;
+      const root = rootOf(row.category_id);
+      const key = root?.id ?? row.category_id;
+      const name = root?.name ?? row.category_name;
+      const cur = totals.get(key) ?? { name, total: 0 };
+      cur.total += row.total;
+      totals.set(key, cur);
+    }
+
+    const top = Array.from(totals.values()).sort((a, b) => b.total - a.total)[0];
     const amount = top?.total ?? 0;
     const sharePct = thisExpense > 0 ? (amount / thisExpense) * 100 : 0;
-    return { name: top?.category_name ?? '-', amount, sharePct };
-  }, [insightThis?.byCategory, thisExpense]);
+    return { name: top?.name ?? '-', amount, sharePct };
+  }, [categories, insightThis?.byCategory, thisExpense]);
 
   const avgExpense = useMemo(() => {
     const targetIdx = Math.max(0, Number(insightMonthKey.split('-')[1]) - 1);
@@ -370,6 +413,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         return <React.Fragment key={`${idx}-${part}`}>{part}</React.Fragment>;
       });
   };
+
+  if (!stats) return <div className="loading-spinner" />;
 
   return (
     <div className="reports-layout">
@@ -521,6 +566,37 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
                       <Cell key={idx} fill={entry.color} />
                     ))}
                   </Pie>
+                  <Tooltip
+                    cursor={false}
+                    content={({ active, payload }) => {
+                      const p = payload?.[0]?.payload as { name?: string; value?: number; pct?: number } | undefined;
+                      if (!active || !p) return null;
+                      return (
+                        <div
+                          style={{
+                            background: 'rgba(10, 12, 16, 0.92)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            borderRadius: 14,
+                            boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
+                            padding: '10px 12px',
+                            color: 'rgba(255,255,255,0.92)',
+                            fontSize: 12,
+                            fontWeight: 750,
+                          }}
+                        >
+                          <div style={{ marginBottom: 6, color: 'rgba(255,255,255,0.80)', fontWeight: 800 }}>
+                            {p.name ?? '-'}
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                            <span>{formatCurrency(Number(p.value) || 0, currency)}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.66)', fontWeight: 750 }}>
+                              {(Number(p.pct) || 0).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="reports-pieCenter">

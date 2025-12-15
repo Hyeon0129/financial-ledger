@@ -6,6 +6,7 @@ import { Icons } from '../common/Icons';
 import { showAlert, showConfirm } from '../common/alertHelpers';
 import { AccountCard } from '../common/AccountCard';
 import { LiquidPanel } from '../common/LiquidPanel';
+import { inferKindFallback, loadAccountMeta, saveAccountMeta, type AccountKind, type CreditCardMeta } from './accountMetaStore';
 
 interface AccountsViewProps {
   accounts: Account[];
@@ -143,21 +144,22 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
       </LiquidPanel>
 
       {/* Account Form Modal */}
-      {showForm && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowForm(false)}>
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">{editingAccount ? '계좌 수정' : '새 계좌'}</h3>
-              <button className="modal-close" onClick={() => setShowForm(false)}><Icons.Close /></button>
-            </div>
-            <AccountForm 
-              account={editingAccount} 
-              onClose={() => setShowForm(false)} 
-              onSave={() => { setShowForm(false); onRefresh(); }} 
-            />
-          </div>
-        </div>
-      )}
+	      {showForm && (
+	        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowForm(false)}>
+	          <div className="modal-content">
+	            <div className="modal-header">
+	              <h3 className="modal-title">{editingAccount ? '계좌 수정' : '새 계좌'}</h3>
+	              <button className="modal-close" onClick={() => setShowForm(false)}><Icons.Close /></button>
+	            </div>
+	            <AccountForm 
+	              account={editingAccount} 
+	              accounts={accounts}
+	              onClose={() => setShowForm(false)} 
+	              onSave={() => { setShowForm(false); onRefresh(); }} 
+	            />
+	          </div>
+	        </div>
+	      )}
 
       {/* Loan Form Modal */}
       {showLoanForm && (
@@ -200,10 +202,41 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
 
 // --- Sub-components for Forms ---
 
-const AccountForm = ({ account, onClose, onSave }: any) => {
+type AccountFormProps = {
+  account: Account | null;
+  accounts: Account[];
+  onClose: () => void;
+  onSave: () => void;
+};
+
+const AccountForm: React.FC<AccountFormProps> = ({ account, accounts, onClose, onSave }) => {
   const [name, setName] = useState(account?.name ?? '');
-  const [type, setType] = useState(account?.type ?? 'bank');
+  const meta = loadAccountMeta();
+  const initialKind: AccountKind = account?.id
+    ? (meta[account.id]?.kind ?? inferKindFallback(account?.type ?? 'bank'))
+    : 'bank';
+  const [kind, setKind] = useState<AccountKind>(initialKind);
   const [balance, setBalance] = useState(account?.balance?.toString() ?? '');
+  const [cycleStartDay, setCycleStartDay] = useState<number>(() => {
+    const m = account?.id ? meta[account.id] : null;
+    return m && m.kind === 'credit_card' ? m.cycleStartDay : 14;
+  });
+  const [cycleEndDay, setCycleEndDay] = useState<number>(() => {
+    const m = account?.id ? meta[account.id] : null;
+    return m && m.kind === 'credit_card' ? m.cycleEndDay : 13;
+  });
+  const [paymentDay, setPaymentDay] = useState<number>(() => {
+    const m = account?.id ? meta[account.id] : null;
+    return m && m.kind === 'credit_card' ? m.paymentDay : 25;
+  });
+  const [creditLimit, setCreditLimit] = useState<string>(() => {
+    const m = account?.id ? meta[account.id] : null;
+    return m && m.kind === 'credit_card' ? String(m.creditLimit ?? '') : '';
+  });
+  const [withdrawAccountId, setWithdrawAccountId] = useState<string>(() => {
+    const m = account?.id ? meta[account.id] : null;
+    return m && m.kind === 'credit_card' ? m.withdrawAccountId : '';
+  });
 
   const handleDelete = async () => {
     if (!account?.id) return;
@@ -219,16 +252,39 @@ const AccountForm = ({ account, onClose, onSave }: any) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { 
-      name, 
-      type, 
-      balance: Number(balance.replace(/,/g,'')), 
+    if (!name.trim()) { showAlert('계좌 이름을 입력해주세요.'); return; }
+    if (kind === 'credit_card' && !withdrawAccountId) {
+      showAlert('신용카드 출금계좌를 선택해주세요.');
+      return;
+    }
+
+    const dbType: Account['type'] = kind === 'bank' ? 'bank' : kind === 'cash' ? 'cash' : 'card';
+    const payload = {
+      name: name.trim(),
+      type: dbType,
+      // credit card balance is derived by transactions (postpaid). Preserve existing balance on edit.
+      balance: kind === 'credit_card' ? Number(account?.balance ?? 0) : Number(balance.replace(/,/g, '')),
       color: '#3B82F6',
-      icon: null 
+      icon: null,
     };
     try {
-      if (account?.id) await accountsApi.update(account.id, payload);
-      else await accountsApi.create(payload);
+      const saved = account?.id ? await accountsApi.update(account.id, payload) : await accountsApi.create(payload);
+      const nextMeta = loadAccountMeta();
+      if (kind === 'credit_card') {
+        const limitValue = Number(String(creditLimit).replace(/,/g, ''));
+        const cc: CreditCardMeta = {
+          kind: 'credit_card',
+          paymentDay: Math.max(1, Math.min(31, Number(paymentDay) || 1)),
+          cycleStartDay: Math.max(1, Math.min(31, Number(cycleStartDay) || 1)),
+          cycleEndDay: Math.max(1, Math.min(31, Number(cycleEndDay) || 1)),
+          withdrawAccountId,
+          creditLimit: Number.isFinite(limitValue) ? Math.max(0, limitValue) : 0,
+        };
+        nextMeta[saved.id] = cc;
+      } else {
+        nextMeta[saved.id] = { kind };
+      }
+      saveAccountMeta(nextMeta);
       onSave();
     } catch {
       showAlert('저장 실패');
@@ -243,17 +299,56 @@ const AccountForm = ({ account, onClose, onSave }: any) => {
       </div>
       <div>
         <label className="form-label">유형</label>
-        <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
+        <select className="form-select" value={kind} onChange={e => setKind(e.target.value as AccountKind)}>
           <option value="bank">은행</option>
-          <option value="card">카드</option>
+          <option value="debit_card">체크카드</option>
+          <option value="credit_card">신용카드</option>
           <option value="cash">현금</option>
-          <option value="investment">투자</option>
         </select>
       </div>
-      <div>
-        <label className="form-label">잔액</label>
-        <input className="form-input" value={balance} onChange={e => setBalance(e.target.value)} placeholder="0" />
-      </div>
+      {kind === 'credit_card' && (
+        <>
+          <div className="form-row">
+            <div>
+              <label className="form-label">청구 주기 시작일</label>
+              <input className="form-input" type="number" min={1} max={31} value={cycleStartDay} onChange={(e) => setCycleStartDay(Number(e.target.value || 1))} />
+            </div>
+            <div>
+              <label className="form-label">청구 주기 종료일</label>
+              <input className="form-input" type="number" min={1} max={31} value={cycleEndDay} onChange={(e) => setCycleEndDay(Number(e.target.value || 1))} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div>
+              <label className="form-label">결제일</label>
+              <input className="form-input" type="number" min={1} max={31} value={paymentDay} onChange={(e) => setPaymentDay(Number(e.target.value || 1))} />
+            </div>
+            <div>
+              <label className="form-label">한도</label>
+              <input className="form-input" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+          <div>
+            <label className="form-label">출금 계좌</label>
+            <select className="form-select" value={withdrawAccountId} onChange={(e) => setWithdrawAccountId(e.target.value)}>
+              <option value="">계좌 선택</option>
+              {accounts
+                .filter((a: Account) => (a.type === 'bank' || a.type === 'cash') && a.id !== account?.id)
+                .map((a: Account) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </>
+      )}
+      {kind !== 'credit_card' && (
+        <div>
+          <label className="form-label">잔액</label>
+          <input className="form-input" value={balance} onChange={e => setBalance(e.target.value)} placeholder="0" />
+        </div>
+      )}
       <div style={{display:'flex', justifyContent:'space-between', marginTop: 20, gap: 12, flexWrap:'wrap'}}>
         {account?.id && (
           <button type="button" className="btn btn-danger" onClick={handleDelete}>삭제</button>
@@ -267,7 +362,15 @@ const AccountForm = ({ account, onClose, onSave }: any) => {
   );
 };
 
-const LoanForm = ({ loan, accounts, categories, onClose, onSave }: any) => {
+type LoanFormProps = {
+  loan: Loan | null;
+  accounts: Account[];
+  categories: Category[];
+  onClose: () => void;
+  onSave: () => void;
+};
+
+const LoanForm: React.FC<LoanFormProps> = ({ loan, accounts, categories, onClose, onSave }) => {
   const [name, setName] = useState(loan?.name ?? '');
   const [principal, setPrincipal] = useState(loan?.principal?.toString() ?? '');
   const [interestRate, setInterestRate] = useState(loan?.interest_rate?.toString() ?? '');
@@ -276,7 +379,7 @@ const LoanForm = ({ loan, accounts, categories, onClose, onSave }: any) => {
   const [dueDay, setDueDay] = useState(loan?.monthly_due_day ?? 1);
   const [accountId, setAccountId] = useState(loan?.account_id ?? accounts[0]?.id ?? '');
   const [categoryId, setCategoryId] = useState(loan?.category_id ?? (categories.find((c: Category) => c.type === 'expense')?.id ?? ''));
-  const [repayType, setRepayType] = useState(loan?.repayment_type ?? 'amortized');
+  const [repayType, setRepayType] = useState<Loan['repayment_type']>(loan?.repayment_type ?? 'amortized');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -340,12 +443,12 @@ const LoanForm = ({ loan, accounts, categories, onClose, onSave }: any) => {
         <div>
           <label className="form-label">납부 계좌</label>
           <select className="form-select" value={accountId} onChange={e => setAccountId(e.target.value)}>
-            {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <div>
           <label className="form-label">상환 방식</label>
-          <select className="form-select" value={repayType} onChange={e => setRepayType(e.target.value)}>
+          <select className="form-select" value={repayType} onChange={e => setRepayType(e.target.value as Loan['repayment_type'])}>
             <option value="amortized">원리금균등</option>
             <option value="principal_equal">원금균등</option>
             <option value="interest_only">만기일시(이자만)</option>
@@ -371,7 +474,14 @@ const LoanForm = ({ loan, accounts, categories, onClose, onSave }: any) => {
   );
 };
 
-const SettleForm = ({ loan, accounts, onClose, onSettled }: any) => {
+type SettleFormProps = {
+  loan: Loan;
+  accounts: Account[];
+  onClose: () => void;
+  onSettled: () => void;
+};
+
+const SettleForm: React.FC<SettleFormProps> = ({ loan, accounts, onClose, onSettled }) => {
   const [amount, setAmount] = useState('');
   const [accId, setAccId] = useState(loan.account_id || accounts[0]?.id || '');
 
@@ -398,7 +508,7 @@ const SettleForm = ({ loan, accounts, onClose, onSettled }: any) => {
       <div>
         <label className="form-label">출금 계좌</label>
         <select className="form-select" value={accId} onChange={e => setAccId(e.target.value)}>
-          {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
       </div>
       <div className="modal-actions">
