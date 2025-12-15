@@ -272,15 +272,68 @@ const TransactionFormModal: React.FC<{
   // ... (Effect hooks for category filtering) ...
   const filteredCategories = useMemo(
     () => (type === 'transfer' ? [] : categories.filter((c) => c.type === type)),
-    [categories, type]
+    [categories, type],
   );
+
+  const categoryUI = useMemo(() => {
+    if (type === 'transfer') {
+      return {
+        parents: [] as Category[],
+        childrenByParent: new Map<string, Category[]>(),
+        orphans: [] as Category[],
+        selectableIds: new Set<string>(),
+        firstSelectableId: '',
+      };
+    }
+
+    const parents = filteredCategories.filter((c) => !c.parent_id);
+    const children = filteredCategories.filter((c) => c.parent_id);
+
+    const parentsById = new Map(parents.map((p) => [p.id, p]));
+    const childCountByParent = new Map<string, number>();
+    for (const c of children) {
+      if (!c.parent_id) continue;
+      childCountByParent.set(c.parent_id, (childCountByParent.get(c.parent_id) ?? 0) + 1);
+    }
+
+    const hasChildren = (id: string) => (childCountByParent.get(id) ?? 0) > 0;
+
+    // Leaf categories only (no children). This disables selecting "대분류".
+    const selectable = filteredCategories.filter((c) => !hasChildren(c.id));
+    const selectableIds = new Set(selectable.map((c) => c.id));
+
+    const childrenByParent = new Map<string, Category[]>();
+    for (const c of children) {
+      if (!c.parent_id) continue;
+      if (!selectableIds.has(c.id)) continue;
+      const arr = childrenByParent.get(c.parent_id) ?? [];
+      arr.push(c);
+      childrenByParent.set(c.parent_id, arr);
+    }
+    for (const [, list] of childrenByParent) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const orphans = children
+      .filter((c) => c.parent_id && !parentsById.has(c.parent_id) && selectableIds.has(c.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const sortedParents = [...parents].sort((a, b) => a.name.localeCompare(b.name));
+
+    // Include root leaf categories too (parents without children).
+    const rootLeaf = sortedParents.filter((p) => selectableIds.has(p.id));
+    const firstSelectableId = (rootLeaf[0]?.id ?? selectable[0]?.id ?? '') as string;
+
+    return { parents: sortedParents, childrenByParent, orphans, selectableIds, firstSelectableId };
+  }, [filteredCategories, type]);
 
   useEffect(() => {
     if (type === 'transfer') return;
-    if (!categoryId && filteredCategories.length > 0) {
-      setCategoryId(filteredCategories[0].id);
+    if (!categoryUI.firstSelectableId) return;
+    if (!categoryId || !categoryUI.selectableIds.has(categoryId)) {
+      setCategoryId(categoryUI.firstSelectableId);
     }
-  }, [type, filteredCategories, categoryId]);
+  }, [type, categoryId, categoryUI.firstSelectableId, categoryUI.selectableIds]);
 
   useEffect(() => {
     if (type !== 'transfer') return;
@@ -363,7 +416,38 @@ const TransactionFormModal: React.FC<{
               <div className="form-group">
                 <label className="form-label">카테고리</label>
                 <select className="form-select" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                  {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {categoryUI.parents.map((parent) => {
+                    const kids = categoryUI.childrenByParent.get(parent.id) ?? [];
+                    const isParentSelectable = categoryUI.selectableIds.has(parent.id) && kids.length === 0;
+                    return (
+                      <React.Fragment key={parent.id}>
+                        {kids.length > 0 ? (
+                          <option value={parent.id} disabled>
+                            {parent.name}
+                          </option>
+                        ) : (
+                          <option value={parent.id} disabled={!isParentSelectable}>
+                            {parent.name}
+                          </option>
+                        )}
+                        {kids.map((child) => (
+                          <option key={child.id} value={child.id}>
+                            ↳ {child.name}
+                          </option>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                  {categoryUI.orphans.length > 0 && (
+                    <option value="" disabled>
+                      ─────────
+                    </option>
+                  )}
+                  {categoryUI.orphans.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}

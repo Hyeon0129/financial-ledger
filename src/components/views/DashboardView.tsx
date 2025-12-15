@@ -15,8 +15,7 @@ import type { Account, Budget, Category, MonthlyStats, SavingsGoal, Transaction 
 import { formatCurrency, formatDate, formatDateShort } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
 import type { View } from '../common/utils';
-import type { BillItem } from './BillsView';
-import { getBills } from './BillsView';
+import { deriveBill, dueDateForMonth, loadBills } from './billsStore';
 
 interface DashboardViewProps {
   stats: MonthlyStats | null;
@@ -98,7 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       .filter((c) => c.total > 0 && c.type === 'expense')
       .sort((a, b) => b.total - a.total);
     const total = items.reduce((sum, c) => sum + c.total, 0) || 1;
-    return items.slice(0, 5).map((c) => ({
+    return items.slice(0, 12).map((c) => ({
       name: c.category_name,
       value: c.total,
       pct: (c.total / total) * 100,
@@ -265,7 +264,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     recentPageSafe * recentPageSize,
   );
 
-  const bills = getBills().slice(0, 1);
+  const bills = useMemo(() => {
+    const recurring = loadBills();
+    const active = recurring
+      .filter((b) => !!dueDateForMonth(b, month))
+      .map((b) => deriveBill(b, month, accounts))
+      .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
+    return active.slice(0, 1);
+  }, [accounts, month]);
   const netChange = income - expense;
   const prevNetChange = (prevStats?.income ?? 0) - (prevStats?.expense ?? 0);
   const netChangeDelta = getDelta(netChange, prevNetChange);
@@ -508,7 +514,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="dash-billsBody">
-          {bills.map((b: BillItem) => (
+          {bills.map((b) => (
             <div key={b.id} className="dash-billCard">
               <div className="dash-billTop">
                 <div className="dash-billIcon">{b.name[0] ?? 'B'}</div>

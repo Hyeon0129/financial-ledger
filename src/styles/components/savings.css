@@ -57,3 +57,68 @@
   margin-top: var(--space-3);
 }
 
+/* =========================
+   Savings Goals Table (manage view)
+   ========================= */
+.goals-manage-table {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: radial-gradient(140% 140% at 50% -25%, rgba(255,255,255,0.06), rgba(0,0,0,0.35));
+  box-shadow: 0 25px 55px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.goals-manage-table .tx-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1fr 1fr 1fr 180px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px;
+}
+
+.goals-manage-table .manage-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.92);
+  text-align: center;
+}
+
+.goals-manage-table .manage-row {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 15px;
+  color: rgba(255,255,255,0.78);
+}
+.goals-manage-table .manage-row:last-child { border-bottom: none; }
+.goals-manage-table .manage-row:hover { background: rgba(255,255,255,0.03); }
+
+.goals-manage-table .tx-col-label { justify-content: flex-start; text-align: left; min-width: 0; }
+.goals-manage-table .tx-col-date,
+.goals-manage-table .tx-col-amount { text-align: center; }
+.goals-manage-table .tx-col-actions { display: inline-flex; justify-content: center; gap: 12px; }
+
+.goals-manage-table .tx-name {
+  font-weight: 750;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goals-manage-table .tx-amount {
+  font-weight: 850;
+  color: rgba(255,255,255,0.92);
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 980px) {
+  .goals-manage-table { overflow-x: auto; }
+  .goals-manage-table .tx-row { min-width: 860px; }
+}
