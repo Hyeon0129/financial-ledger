@@ -366,6 +366,7 @@
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: -0.01em;
+  
 }
 
 .dash-subHint {
@@ -603,7 +604,7 @@
 }
 
 /* No nested card for donut */
-.dash-donutBox { padding: 0 0 0 18px; }
+.dash-donutBox { padding: 0 0 0 100px; }
 
 .dash-donutChart {
   position: relative;
@@ -817,7 +818,7 @@
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 6px 0px;
   border-radius: 10px;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
