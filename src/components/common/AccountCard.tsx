@@ -38,7 +38,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const icon = getIconByName(account.name || '');
   const remaining = Number(account.balance) || 0;
   const spent = Number(monthlySpend) || 0;
-  const holder = userEmail || '-';
+  const holder = (userEmail || '-').split('@')[0] || '-';
 
   return (
     <div className={`bank-card ${preset} ${className || ''}`} role="button" tabIndex={0}>
@@ -63,15 +63,13 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           <div className="card-val holder">{holder}</div>
         </div>
 
-        <div className="card-metrics">
-          <div className="card-block right">
-            <div className="card-label">남은금액</div>
-            <div className="card-val">{formatCurrency(remaining, currency)}</div>
-          </div>
-          <div className="card-block right">
-            <div className="card-label">이번달 사용</div>
-            <div className="card-val">{formatCurrency(spent, currency)}</div>
-          </div>
+        <div className="card-block">
+          <div className="card-label">Remaining</div>
+          <div className="card-val">{formatCurrency(remaining, currency)}</div>
+        </div>
+        <div className="card-block">
+          <div className="card-label">This month spent</div>
+          <div className="card-val">{formatCurrency(spent, currency)}</div>
         </div>
       </div>
     </div>

@@ -478,6 +478,7 @@
   align-items: stretch;
   flex: 1;
   min-height: 0;
+  height: 100%;
 }
 
 @media (max-width: 1180px) {
@@ -491,14 +492,25 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  flex: 1;
+  position: relative;
+}
+
+.dash-recentScroll {
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .dash-recentHead,
 .dash-recentRow {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr 1fr 1fr 1.5fr;
-  gap: 12px;
+  grid-template-columns:
+    minmax(120px, 1.5fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr);
+  gap: 40px;
   align-items: center;
   padding: 12px 12px;
 }
@@ -509,16 +521,26 @@
   z-index: 1;
   background: rgba(0,0,0,0.12);
   border-bottom: 1px solid rgba(255,255,255,0.10);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.86);
+  color: rgba(255,255,255,0.98);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+}
+
+.dash-recentHead .dash-recentColDate { text-align: center; }
+.dash-recentHead .dash-recentColCat { text-align: center; }
+.dash-recentHead .dash-recentColAmt { text-align: center; }
+.dash-recentHead .dash-recentColAcc { text-align: center; }
+.dash-recentHead .dash-recentColMemo { text-align: center; }
+
+.dash-recentHead > div,
+.dash-recentRow > div {
+  min-width: 0;
 }
 
 .dash-recentBody {
-  overflow: auto;
-  flex: 1;
   min-height: 0;
 }
 
@@ -527,31 +549,32 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 12px 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 0;
   width: 100%;
-  background: rgba(0,0,0,0.10);
+  background: transparent;
+  flex: 0 0 auto;
 }
 
 .dash-recentRow {
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  font-size: 12px;
+  font-size: 15px;
   color: rgba(255,255,255,0.76);
 }
 .dash-recentRow:last-child { border-bottom: none; }
 .dash-recentRow:hover { background: rgba(255,255,255,0.03); }
 
-.dash-recentColDate { color: rgba(255,255,255,0.62); text-align: center; }
-.dash-recentColAmt { text-align: right; font-weight: 750; color: rgba(255,255,255,0.92); }
+.dash-recentColDate { color: rgba(255,255,255,0.62); text-align: left; }
+.dash-recentColAmt { text-align: center; font-weight: 750; color: rgba(255,255,255,0.92); }
 .dash-recentColAcc { text-align: center; color: rgba(255,255,255,0.78); }
-.dash-recentColMemo { color: rgba(255,255,255,0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-recentColMemo { color: rgba(255,255,255,0.62); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.dash-recentColCat {
+.dash-recentColCat { min-width: 0; }
+.dash-recentHead .dash-recentColCat { display: block; }
+.dash-recentRow .dash-recentColCat {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 
 .dash-recentDot {
@@ -760,15 +783,17 @@
 
 .dash-billsViewAll {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   color: rgba(255, 255, 255, 0.90);
-  padding: 10px 12px;
+  padding: 8px 12px;
   font-size: 13px;
   font-weight: 750;
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
-  width: 160px;
+  width: 140px;
   align-self: center;
 }
 .dash-billsViewAll:hover {
@@ -801,8 +826,3 @@
 
 /* Light theme readability tweaks (do not touch KPI cards) */
 body[data-theme="light"] .dash-subHint { color: rgba(255,255,255,0.76); }
-body[data-theme="light"] .dash-recentHead { color: rgba(255,255,255,0.82); }
-body[data-theme="light"] .dash-recentRow { color: rgba(255,255,255,0.80); }
-body[data-theme="light"] .dash-recentColDate { color: rgba(255,255,255,0.72); }
-body[data-theme="light"] .dash-recentColAcc { color: rgba(255,255,255,0.74); }
-body[data-theme="light"] .dash-recentColMemo { color: rgba(255,255,255,0.72); }

@@ -52,29 +52,35 @@
   gap: var(--space-2);
   padding: 0 24px; /* Increased padding */
   min-height: 48px; /* Taller touch target */
-  border: 1px solid var(--glass-pill-border);
-  border-radius: 14px;
-  background: var(--glass-pill-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   font-size: 15px; /* Larger font */
   font-weight: 600;
   color: var(--glass-text-strong);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
   white-space: nowrap;
   letter-spacing: -0.01em;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 .btn:hover {
-  background: rgba(255,255,255,0.2);
-  border-color: rgba(255,255,255,0.4);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .btn:active {
-  transform: translateY(0);
+  transform: translateY(-1px);
+  transition: transform 0.1s ease;
 }
 
 .btn:disabled {
@@ -84,13 +90,13 @@
 }
 
 .btn-primary {
-  background: var(--glass-bg-strong);
-  border-color: var(--glass-border-strong);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .btn-primary:hover {
-  background: rgba(255,255,255,0.3);
-  border-color: rgba(255,255,255,0.6);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .btn-ghost {
@@ -103,13 +109,47 @@
 }
 
 .btn-danger {
-  background: rgba(255, 23, 68, 0.14);
-  border-color: rgba(255, 23, 68, 0.22);
+  background: rgba(255, 23, 68, 0.12);
+  border-color: rgba(255, 23, 68, 0.24);
   color: rgba(255,255,255,0.92);
 }
 .btn-danger:hover {
-  background: rgba(255, 23, 68, 0.18);
-  border-color: rgba(255, 23, 68, 0.28);
+  background: rgba(255, 23, 68, 0.16);
+  border-color: rgba(255, 23, 68, 0.30);
+}
+
+/* Light theme: make buttons read well on bright purple bg */
+body[data-theme="light"] .btn {
+  border: 2px solid rgba(255,255,255,0.22);
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.24), rgba(255, 255, 255, 0.02));
+  color: rgba(255,255,255,0.94);
+  box-shadow:
+    inset 8px 8px 16px rgba(0, 0, 0, 0.18),
+    inset -8px -8px 16px rgba(255, 255, 255, 0.06),
+    0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+body[data-theme="light"] .btn:hover {
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.04));
+  border-color: rgba(255,255,255,0.28);
+  box-shadow:
+    inset 0 0 14px rgba(255, 255, 255, 0.16),
+    0 14px 36px rgba(0, 0, 0, 0.26);
+}
+
+body[data-theme="light"] .btn-primary {
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.26), rgba(255, 255, 255, 0.03));
+  border-color: rgba(255,255,255,0.26);
+}
+
+body[data-theme="light"] .btn-ghost {
+  background: rgba(0,0,0,0.18);
+  border-color: rgba(255,255,255,0.20);
+}
+
+body[data-theme="light"] .btn-danger {
+  background: rgba(255, 23, 68, 0.14);
+  border-color: rgba(255, 23, 68, 0.26);
 }
 
 .btn-sm {
@@ -125,38 +165,6 @@
   border-radius: 12px;
 }
 
-/* ========== Modals (Enhanced) ========== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-content {
-  background: var(--bg-primary); /* Fallback */
-  border-radius: 24px;
-  padding: 32px;
-  width: 100%;
-  max-width: 500px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--glass-border);
-  position: relative;
-  
-  /* Liquid Glass Style */
-  background: rgba(20, 20, 35, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  color: var(--text-main);
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -168,6 +176,10 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--text-main);
+}
+
+body[data-theme="light"] .modal-title {
+  color: rgba(12, 18, 30, 0.92);
 }
 
 .modal-close {
@@ -182,6 +194,14 @@
 .modal-close:hover {
   background: rgba(255,255,255,0.1);
   color: var(--text-main);
+}
+
+body[data-theme="light"] .modal-close {
+  color: rgba(12, 18, 30, 0.60);
+}
+body[data-theme="light"] .modal-close:hover {
+  background: rgba(0,0,0,0.06);
+  color: rgba(12, 18, 30, 0.92);
 }
 
 .modal-body {
@@ -211,12 +231,37 @@
   border-color: var(--accent-blue);
   background: rgba(0,0,0,0.3);
 }
+
+body[data-theme="light"] .form-input,
+body[data-theme="light"] .form-select,
+body[data-theme="light"] .form-textarea {
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(0,0,0,0.12);
+  color: rgba(12, 18, 30, 0.92);
+}
+
+body[data-theme="light"] .form-input:focus,
+body[data-theme="light"] .form-select:focus,
+body[data-theme="light"] .form-textarea:focus {
+  border-color: rgba(168, 85, 247, 0.70);
+  background: rgba(255,255,255,0.18);
+}
+
+body[data-theme="light"] .form-input::placeholder,
+body[data-theme="light"] .form-textarea::placeholder {
+  color: rgba(12, 18, 30, 0.52);
+}
+
 .form-label {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 8px;
   display: block;
+}
+
+body[data-theme="light"] .form-label {
+  color: rgba(12, 18, 30, 0.66);
 }
 
 /* ========== Tables (Liquid Style Base) ========== */

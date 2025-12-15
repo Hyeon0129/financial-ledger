@@ -85,9 +85,34 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   };
 
   const expenseTransactions = useMemo(
-    () => transactions.filter((t) => t.type === 'expense'),
+    () =>
+      [...transactions]
+        .filter((t) => t.type === 'expense')
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [transactions]
   );
+
+  const [expenseQuery, setExpenseQuery] = useState('');
+  const [expensePerPage, setExpensePerPage] = useState<number>(30);
+  const [expensePage, setExpensePage] = useState<number>(1);
+
+  const expenseFiltered = useMemo(() => {
+    const q = expenseQuery.trim().toLowerCase();
+    if (!q) return expenseTransactions;
+    return expenseTransactions.filter((t) => {
+      const hay = `${t.date} ${formatDate(t.date)} ${String(t.amount)} ${formatCurrency(t.amount, currency)} ${
+        t.category_name ?? ''
+      } ${t.account_name ?? ''} ${t.memo ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [currency, expenseQuery, expenseTransactions]);
+
+  const expenseTotalPages = Math.max(1, Math.ceil(expenseFiltered.length / expensePerPage));
+  const expensePageSafe = Math.min(expenseTotalPages, Math.max(1, expensePage));
+  const expensePageStart = (expensePageSafe - 1) * expensePerPage;
+  const expensePageItems = expenseFiltered.slice(expensePageStart, expensePageStart + expensePerPage);
+  const expenseShowingFrom = expenseFiltered.length === 0 ? 0 : expensePageStart + 1;
+  const expenseShowingTo = Math.min(expenseFiltered.length, expensePageStart + expensePageItems.length);
 
   return (
     <>
@@ -137,8 +162,40 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
 
         <LiquidPanel>
           <div className="panel-header">
-            <div>
-              <div className="panel-title">지출 내역</div>
+            <div className="panel-title">지출 내역</div>
+            <input
+              className="budgets-search"
+              type="search"
+              placeholder="Search..."
+              value={expenseQuery}
+              onChange={(e) => {
+                setExpenseQuery(e.target.value);
+                setExpensePage(1);
+              }}
+            />
+          </div>
+          <div className="budgets-toolbar">
+            <div className="budgets-toolbar-left">
+              <span>Show</span>
+              <div className="budgets-selectWrap">
+                <select
+                  className="budgets-select"
+                  value={expensePerPage}
+                  onChange={(e) => {
+                    setExpensePerPage(Number(e.target.value));
+                    setExpensePage(1);
+                  }}
+                >
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                  <option value={70}>70</option>
+                  <option value={100}>100</option>
+                </select>
+                <div className="budgets-selectArrow" aria-hidden="true">
+                  <Icons.ChevronDown />
+                </div>
+              </div>
+              <span>entries</span>
             </div>
           </div>
           <div className="transactions-table-lite budgets-expense-table manage-table">
@@ -149,7 +206,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
               <div className="budgets-cell budgets-cell-accHead">계좌</div>
               <div className="budgets-cell budgets-cell-memoHead">메모</div>
             </div>
-            {expenseTransactions.map((t) => (
+            {expensePageItems.map((t) => (
               <div key={t.id} className="budgets-expenseRow">
                 <div className="budgets-cell budgets-cell-date">{formatDate(t.date)}</div>
                 <div className="budgets-cell budgets-cell-catVal">{t.category_name}</div>
@@ -158,11 +215,39 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                 <div className="budgets-cell budgets-cell-memoVal">{t.memo || '-'}</div>
               </div>
             ))}
-            {expenseTransactions.length === 0 && (
+            {expenseFiltered.length === 0 && (
               <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
                 지출 내역이 없습니다.
               </div>
             )}
+          </div>
+          <div className="budgets-foot">
+            <div className="budgets-rangeInfo">
+              Showing {expenseShowingFrom} to {expenseShowingTo} of {expenseFiltered.length} entries
+            </div>
+            <div className="budgets-pager" aria-label="Expense table pagination">
+              <button
+                className="budgets-pagerBtn"
+                type="button"
+                onClick={() => setExpensePage((p) => Math.max(1, p - 1))}
+                disabled={expensePageSafe <= 1}
+                aria-label="Previous"
+              >
+                ‹
+              </button>
+              <span className="budgets-pagerText">
+                {expensePageSafe}/{expenseTotalPages}
+              </span>
+              <button
+                className="budgets-pagerBtn"
+                type="button"
+                onClick={() => setExpensePage((p) => Math.min(expenseTotalPages, p + 1))}
+                disabled={expensePageSafe >= expenseTotalPages}
+                aria-label="Next"
+              >
+                ›
+              </button>
+            </div>
           </div>
         </LiquidPanel>
       </div>

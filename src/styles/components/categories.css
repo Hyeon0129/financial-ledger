@@ -70,17 +70,19 @@
 }
 
 .cat-head {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.70);
+  color: rgba(255,255,255,0.92);
   border-bottom: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.12);
 }
 
 .cat-row {
   border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 15px;
+  color: rgba(255,255,255,0.78);
 }
 .cat-row:last-child { border-bottom: none; }
 .cat-row:hover { background: rgba(255,255,255,0.03); }
@@ -140,19 +142,19 @@
 }
 
 .cat-gridHead {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.70);
+  color: rgba(255,255,255,0.92);
   border-bottom: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.12);
 }
 
 .cat-gridRow {
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.88);
-  font-size: 13px;
+  color: rgba(255,255,255,0.78);
+  font-size: 15px;
 }
 .cat-gridRow:last-child { border-bottom: none; }
 .cat-gridRow:hover { background: rgba(255,255,255,0.03); }
@@ -172,7 +174,7 @@
 .cat-grid .cat-col-type {
   text-align: center;
   color: rgba(255,255,255,0.70);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
 }
 

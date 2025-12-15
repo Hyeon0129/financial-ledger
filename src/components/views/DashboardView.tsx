@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { Account, Budget, Category, MonthlyStats, SavingsGoal, Transaction } from '../../api';
-import { formatCurrency, formatDateShort } from '../../api';
+import { formatCurrency, formatDate, formatDateShort } from '../../api';
 import { LiquidPanel } from '../common/LiquidPanel';
 import type { View } from '../common/utils';
 import type { BillItem } from './BillsView';
@@ -40,13 +40,38 @@ function getDelta(curr: number, prev: number) {
   return { val: diff, pct: (diff / prev) * 100 };
 }
 
+const TrendPill: React.FC<{ dir: TrendDir; pct: number }> = ({ dir, pct }) => (
+  <span className={`trend ${dir}`}>
+    <i className={`ph ${dir === 'up' ? 'ph-trend-up' : 'ph-trend-down'}`} />
+    {dir === 'up' ? '+' : '-'}
+    {Math.abs(pct).toFixed(2)}%
+  </span>
+);
+
+const SmallKpiCard: React.FC<{
+  title: string;
+  value: React.ReactNode;
+  trendPct?: number;
+  trendDir?: TrendDir;
+  children?: React.ReactNode;
+}> = ({ title, value, trendPct, trendDir, children }) => (
+  <LiquidPanel className="interactive dash-kpiCard">
+    <div className="dash-kpiTitle">{title}</div>
+    <div className="dash-kpiValue">{value}</div>
+    <div className="dash-kpiSub">
+      {typeof trendPct === 'number' && trendDir ? <TrendPill dir={trendDir} pct={trendPct} /> : <span />}
+      <span className="dash-kpiSubText">vs last month</span>
+    </div>
+    {children}
+  </LiquidPanel>
+);
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   stats,
   prevStats,
   transactions,
   accounts,
   budgets,
-  savingsGoals: _savingsGoals,
   yearlyStats,
   currency,
   month,
@@ -151,14 +176,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [dailyTotals, month, range, stats, yearlyStats?.monthlyTrend]);
 
-  const TrendPill: React.FC<{ dir: TrendDir; pct: number }> = ({ dir, pct }) => (
-    <span className={`trend ${dir}`}>
-      <i className={`ph ${dir === 'up' ? 'ph-trend-up' : 'ph-trend-down'}`} />
-      {dir === 'up' ? '+' : '-'}
-      {Math.abs(pct).toFixed(2)}%
-    </span>
-  );
-
   const renderSpeedometer = (progressPct: number) => {
     const clamp = (n: number) => Math.max(0, Math.min(100, n));
     const pct = clamp(progressPct);
@@ -225,30 +242,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   };
 
-  const SmallKpiCard: React.FC<{
-    title: string;
-    value: React.ReactNode;
-    trendPct?: number;
-    trendDir?: TrendDir;
-    children?: React.ReactNode;
-  }> = ({ title, value, trendPct, trendDir, children }) => (
-    <LiquidPanel className="interactive dash-kpiCard">
-      <div className="dash-kpiTitle">{title}</div>
-      <div className="dash-kpiValue">{value}</div>
-      <div className="dash-kpiSub">
-        {typeof trendPct === 'number' && trendDir ? <TrendPill dir={trendDir} pct={trendPct} /> : <span />}
-        <span className="dash-kpiSubText">vs last month</span>
-      </div>
-      {children}
-    </LiquidPanel>
-  );
-
-  const recentExpensesAll = useMemo(
-    () => transactions.filter((t) => t.type === 'expense' && t.date.startsWith(month)).slice(0, 120),
-    [transactions, month],
-  );
-  const [recentPage, setRecentPage] = useState(1);
+  const recentExpensesAll = useMemo(() => {
+    return [...transactions]
+      .filter((t) => t.type === 'expense' && t.date.startsWith(month))
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }, [transactions, month]);
   const recentPageSize = 10;
+  const [recentPageByMonth, setRecentPageByMonth] = useState<Record<string, number>>({});
+  const recentPage = recentPageByMonth[month] ?? 1;
+  const setRecentPage = (updater: number | ((prev: number) => number)) => {
+    setRecentPageByMonth((prev) => {
+      const prevValue = prev[month] ?? 1;
+      const nextValue = typeof updater === 'function' ? updater(prevValue) : updater;
+      if (nextValue === prevValue) return prev;
+      return { ...prev, [month]: nextValue };
+    });
+  };
   const recentTotalPages = Math.max(1, Math.ceil(recentExpensesAll.length / recentPageSize));
   const recentPageSafe = Math.min(recentTotalPages, Math.max(1, recentPage));
   const recentPageItems = recentExpensesAll.slice(
@@ -396,27 +405,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div className="dash-activityGrid">
           <div className="dash-recentTableWrap">
-            <div className="dash-recentHead">
-              <div className="dash-recentColDate">날짜</div>
-              <div className="dash-recentColCat">카테고리</div>
-              <div className="dash-recentColAmt">금액</div>
-              <div className="dash-recentColAcc">계좌</div>
-              <div className="dash-recentColMemo">메모</div>
-            </div>
-            <div className="dash-recentBody">
-              {recentPageItems.map((t) => (
-                <div key={t.id} className="dash-recentRow">
-                  <div className="dash-recentColDate">{formatDateShort(t.date)}</div>
-                  <div className="dash-recentColCat">
-                    <span className="dash-recentDot" style={{ background: t.category_color || 'rgba(255,255,255,0.18)' }} />
-                    <span className="dash-recentCatName">{t.category_name || 'Uncategorized'}</span>
+            <div className="dash-recentScroll">
+              <div className="dash-recentHead">
+                <div className="dash-recentColDate">날짜</div>
+                <div className="dash-recentColCat">카테고리</div>
+                <div className="dash-recentColAmt">금액</div>
+                <div className="dash-recentColAcc">계좌</div>
+                <div className="dash-recentColMemo">메모</div>
+              </div>
+              <div className="dash-recentBody">
+                {recentPageItems.map((t) => (
+                  <div key={t.id} className="dash-recentRow">
+                    <div className="dash-recentColDate">{formatDate(t.date)}</div>
+                    <div className="dash-recentColCat">
+                      <span className="dash-recentDot" style={{ background: t.category_color || 'rgba(255,255,255,0.18)' }} />
+                      <span className="dash-recentCatName">{t.category_name || 'Uncategorized'}</span>
+                    </div>
+                    <div className="dash-recentColAmt">{formatCurrency(t.amount, currency)}</div>
+                    <div className="dash-recentColAcc">{t.account_name || '-'}</div>
+                    <div className="dash-recentColMemo">{t.memo || '-'}</div>
                   </div>
-                  <div className="dash-recentColAmt">{formatCurrency(t.amount, currency)}</div>
-                  <div className="dash-recentColAcc">{t.account_name || '-'}</div>
-                  <div className="dash-recentColMemo">{t.memo || '-'}</div>
-                </div>
-              ))}
-              {recentExpensesAll.length === 0 && <div className="dash-empty">No expenses</div>}
+                ))}
+                {recentExpensesAll.length === 0 && <div className="dash-empty">No expenses</div>}
+              </div>
             </div>
             <div className="dash-recentPager" aria-label="Recent spending pagination">
               <button

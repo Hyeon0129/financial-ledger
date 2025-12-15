@@ -202,14 +202,19 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
 .card-mid { flex: 1; }
 
 .card-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 18px;
+  align-items: end;
   z-index: 2;
 }
 
-.card-block { min-width: 0; }
+.card-block {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
 
 .card-label {
   font-size: 10px;
@@ -236,14 +241,6 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.card-metrics {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-}
-
-.card-block.right { text-align: right; }
 
 /* Presets (6) */
 .style-amber {
@@ -326,7 +323,7 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
   font-weight: 800;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.86);
+  color: rgba(255,255,255,0.92);
   border-bottom: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.12);
 }
