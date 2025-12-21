@@ -30,3 +30,5 @@ data/
 *.db-wal
 *.db-shm
 dist
+disk-electron/
+node_modules/

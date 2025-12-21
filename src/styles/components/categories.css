@@ -122,7 +122,7 @@
   display: flex;
   flex-direction: column;
   border-radius: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cat-gridHead,
@@ -196,4 +196,99 @@
   padding: 24px 12px;
   color: rgba(255,255,255,0.62);
   text-align: center;
+}
+
+/* ========== Categories Page (Sticky + Full Page Scroll) ========== */
+.categories-view {
+  --cat-sticky-top: 86px;
+}
+
+.cat-pageTop {
+  position: static;
+  padding: 0;
+  margin-bottom: 20px;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.cat-pageTopInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cat-panel {
+  overflow: visible;
+}
+.cat-panel .glass-filter,
+.cat-panel .glass-overlay,
+.cat-panel .glass-specular {
+  border-radius: inherit;
+}
+.cat-panelContent {
+  height: auto;
+}
+
+/* Sticky column headers (relative to app-content scroll) */
+.cat-stickyHead {
+  position: static;
+}
+
+/* Allow sticky headers to work (no local scroll containers) */
+.cat-list {
+  overflow: visible;
+}
+
+/* Parent collapse toggle */
+.cat-parentBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cat-parentBtn .cat-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-collapseIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  color: rgba(255,255,255,0.78);
+  flex: 0 0 auto;
+  transition: transform 0.18s ease;
+}
+.cat-collapseIcon.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.cat-count {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.70);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+@media (max-width: 860px) {
+  .categories-view { --cat-sticky-top: 96px; }
 }

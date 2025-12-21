@@ -14,6 +14,7 @@ interface CategoriesViewProps {
 export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRefresh }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [collapsedParents, setCollapsedParents] = useState<Record<string, boolean>>({});
 
   const handleEdit = (cat: Category) => {
     setEditingCategory(cat);
@@ -50,22 +51,34 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
     return { grouped, orphans };
   }, [expenseCategories]);
 
+  const toggleParent = (parentId: string) => {
+    setCollapsedParents((prev) => ({ ...prev, [parentId]: !prev[parentId] }));
+  };
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 className="panel-title">Categories</h2>
-        <button className="btn btn-primary" onClick={() => { setEditingCategory(null); setShowForm(true); }}>
-          <Icons.Plus /> 새 카테고리
-        </button>
-      </div>
-
-      <LiquidPanel style={{marginBottom: 24}}>
-        <div className="panel-header">
-          <div className="panel-title">수입 카테고리</div>
+      <div className="categories-view">
+        <div className="cat-pageTop">
+          <div className="cat-pageTopInner">
+            <h2 className="panel-title">Categories</h2>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setEditingCategory(null);
+                setShowForm(true);
+              }}
+            >
+              <Icons.Plus /> 새 카테고리
+            </button>
+          </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+
+        <LiquidPanel className="cat-panel" contentClassName="cat-panelContent" style={{ marginBottom: 24 }}>
+          <div className="panel-header">
+            <div className="panel-title">수입 카테고리</div>
+          </div>
           <div className="cat-list">
-            <div className="cat-head">
+            <div className="cat-head cat-stickyHead">
               <div className="cat-col-name">이름</div>
               <div className="cat-col-actions">작업</div>
             </div>
@@ -91,64 +104,72 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
               </div>
             )}
           </div>
-        </div>
-      </LiquidPanel>
+        </LiquidPanel>
 
-      <LiquidPanel>
-        <div className="panel-header">
-          <div className="panel-title">지출 카테고리</div>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
+        <LiquidPanel className="cat-panel" contentClassName="cat-panelContent">
+          <div className="panel-header">
+            <div className="panel-title">지출 카테고리</div>
+          </div>
           <div className="cat-grid">
-            <div className="cat-gridHead">
+            <div className="cat-gridHead cat-stickyHead">
               <div className="cat-col-parent">대분류</div>
               <div className="cat-col-child">소분류</div>
               <div className="cat-col-type">구분</div>
               <div className="cat-col-actions">작업</div>
             </div>
 
-            {expenseTree.grouped.map(({ parent, children }) => (
-              <React.Fragment key={parent.id}>
-                <div className="cat-gridRow is-parent">
-                  <div className="cat-col-parent">
-                    <span className="cat-dot" style={{ background: parent.color }} />
-                    <span className="cat-name">{parent.name}</span>
-                  </div>
-                  <div className="cat-col-child cat-muted">-</div>
-                  <div className="cat-col-type">대분류</div>
-                  <div className="cat-col-actions">
-                    <button className="btn btn-sm" onClick={() => handleEdit(parent)}>
-                      수정
-                    </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>
-                      삭제
-                    </button>
-                  </div>
-                </div>
-
-                {children.map((child) => (
-                  <div key={child.id} className="cat-gridRow">
-                    <div className="cat-col-parent cat-muted">
-                      <span className="cat-indent">↳</span>
-                      <span className="cat-name">{parent.name}</span>
+            {expenseTree.grouped.map(({ parent, children }) => {
+              const isCollapsed = !!collapsedParents[parent.id];
+              return (
+                <React.Fragment key={parent.id}>
+                  <div className="cat-gridRow is-parent">
+                    <div className="cat-col-parent">
+                      <button type="button" className="cat-parentBtn" onClick={() => toggleParent(parent.id)}>
+                        <span className={`cat-collapseIcon ${isCollapsed ? 'is-collapsed' : ''}`}>
+                          <Icons.ChevronDown />
+                        </span>
+                        <span className="cat-dot" style={{ background: parent.color }} />
+                        <span className="cat-name">{parent.name}</span>
+                        <span className="cat-count mono">{children.length}</span>
+                      </button>
                     </div>
-                    <div className="cat-col-child">
-                      <span className="cat-dot" style={{ background: child.color }} />
-                      <span className="cat-name">{child.name}</span>
-                    </div>
-                    <div className="cat-col-type cat-muted">소분류</div>
+                    <div className="cat-col-child cat-muted">-</div>
+                    <div className="cat-col-type">대분류</div>
                     <div className="cat-col-actions">
-                      <button className="btn btn-sm" onClick={() => handleEdit(child)}>
+                      <button className="btn btn-sm" onClick={() => handleEdit(parent)}>
                         수정
                       </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>
                         삭제
                       </button>
                     </div>
                   </div>
-                ))}
-              </React.Fragment>
-            ))}
+
+                  {!isCollapsed &&
+                    children.map((child) => (
+                      <div key={child.id} className="cat-gridRow">
+                        <div className="cat-col-parent cat-muted">
+                          <span className="cat-indent">↳</span>
+                          <span className="cat-name">{parent.name}</span>
+                        </div>
+                        <div className="cat-col-child">
+                          <span className="cat-dot" style={{ background: child.color }} />
+                          <span className="cat-name">{child.name}</span>
+                        </div>
+                        <div className="cat-col-type cat-muted">소분류</div>
+                        <div className="cat-col-actions">
+                          <button className="btn btn-sm" onClick={() => handleEdit(child)}>
+                            수정
+                          </button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </React.Fragment>
+              );
+            })}
 
             {expenseTree.orphans.map((child) => (
               <div key={child.id} className="cat-gridRow">
@@ -173,8 +194,8 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
               <div className="cat-empty">지출 카테고리가 없습니다.</div>
             )}
           </div>
-        </div>
-      </LiquidPanel>
+        </LiquidPanel>
+      </div>
 
       {showForm && (
         <CategoryFormModal
