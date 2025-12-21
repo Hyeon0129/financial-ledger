@@ -260,6 +260,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                   }}
                 >
                   <div className="budgets-cell budgets-cell-cat">
+                    <span className="budgets-dot" style={{ background: label.color }} />
                     <div className="budgets-catStack">
                       <div className="budgets-catName">{label.name}</div>
                       {label.parentName && <div className="budgets-catParent">{label.parentName}</div>}
