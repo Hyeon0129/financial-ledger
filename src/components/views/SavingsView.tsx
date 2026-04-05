@@ -4,6 +4,7 @@ import type { SavingsGoal } from '../../api';
 import { savingsGoalsApi, formatCurrency, formatDate } from '../../api';
 import { Icons } from '../common/Icons';
 import { showAlert, showConfirm } from '../common/alertHelpers';
+import { LiquidPanel } from '../common/LiquidPanel';
 
 interface SavingsViewProps {
   goals: SavingsGoal[];
@@ -31,40 +32,44 @@ export const SavingsView: React.FC<SavingsViewProps> = ({ goals, currency, onRef
       </div>
 
       {goals.length > 0 ? (
-        <div className="transactions-table-lite goals-manage-table">
-          <div className="tx-row manage-head">
-            <div className="tx-col-label">목표</div>
-            <div className="tx-col-amount">진행률</div>
-            <div className="tx-col-amount">현재 금액</div>
-            <div className="tx-col-amount">목표 금액</div>
-            <div className="tx-col-date">기한</div>
-            <div className="tx-col-actions">작업</div>
-          </div>
-          {goals.map((goal) => {
-            const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
-            return (
-              <div key={goal.id} className="tx-row manage-row">
-                <div className="tx-main tx-col-label">
-                  <div className="tx-main-text">
-                    <div className="tx-name">{goal.name}</div>
+        <LiquidPanel className="interactive">
+          <div className="transactions-table-lite goals-manage-table">
+            <div className="tx-row manage-head">
+              <div className="tx-col-label">목표</div>
+              <div className="tx-col-amount">진행률</div>
+              <div className="tx-col-amount">현재 금액</div>
+              <div className="tx-col-amount">목표 금액</div>
+              <div className="tx-col-date">기한</div>
+              <div className="tx-col-actions">작업</div>
+            </div>
+            {goals.map((goal) => {
+              const progress = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
+              return (
+                <div key={goal.id} className="tx-row manage-row">
+                  <div className="tx-main tx-col-label">
+                    <div className="tx-main-text">
+                      <div className="tx-name">{goal.name}</div>
+                    </div>
+                  </div>
+                  <div className="tx-col-amount">{progress.toFixed(0)}%</div>
+                  <div className="tx-amount tx-col-amount">{formatCurrency(goal.current_amount, currency)}</div>
+                  <div className="tx-amount tx-col-amount">{formatCurrency(goal.target_amount, currency)}</div>
+                  <div className="tx-col-date">{goal.deadline ? formatDate(goal.deadline) : '-'}</div>
+                  <div className="tx-col-actions">
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
                   </div>
                 </div>
-                <div className="tx-col-amount">{progress.toFixed(0)}%</div>
-                <div className="tx-amount tx-col-amount">{formatCurrency(goal.current_amount, currency)}</div>
-                <div className="tx-amount tx-col-amount">{formatCurrency(goal.target_amount, currency)}</div>
-                <div className="tx-col-date">{goal.deadline ? formatDate(goal.deadline) : '-'}</div>
-                <div className="tx-col-actions">
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(goal.id)}>삭제</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </LiquidPanel>
       ) : (
-        <div className="empty-state" style={{ borderRadius: 20, padding: 60 }}>
-          <div className="empty-state-title">저축 목표가 없습니다</div>
-          <div className="empty-state-text">첫 저축 목표를 만들어 진행 상황을 추적해보세요.</div>
-        </div>
+        <LiquidPanel className="interactive">
+          <div className="empty-state" style={{ borderRadius: 20, padding: 60 }}>
+            <div className="empty-state-title">저축 목표가 없습니다</div>
+            <div className="empty-state-text">첫 저축 목표를 만들어 진행 상황을 추적해보세요.</div>
+          </div>
+        </LiquidPanel>
       )}
 
       {showForm && (

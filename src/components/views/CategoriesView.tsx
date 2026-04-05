@@ -60,7 +60,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
       <div className="categories-view">
         <div className="cat-pageTop">
           <div className="cat-pageTopInner">
-            <h2 className="panel-title">Categories</h2>
+            <h2 className="panel-title">카테고리</h2>
             <button
               className="btn btn-primary"
               onClick={() => {

@@ -831,7 +831,14 @@ export const budgetsApi = {
     const cats = await categoriesApi.list();
     const catMap = new Map(cats.map(c => [c.id, c]));
 
-    return budgets.map(b => {
+    const uniqueBudgets = Array.from(
+      budgets.reduce((acc, b) => {
+        acc.set(b.category_id, b);
+        return acc;
+      }, new Map<string, typeof budgets[0]>()).values()
+    );
+
+    return uniqueBudgets.map(b => {
       const cat = catMap.get(b.category_id);
       return {
         ...b,
@@ -845,7 +852,11 @@ export const budgetsApi = {
   // 원본 시그니처 유지: (category_id, amount)  + month는 옵션(안 쓰면 자동)
   create: async (data: { category_id: string; amount: number; month?: string }): Promise<Budget> => {
     const user = await getUserOrThrow();
-    const month = data.month ?? getMonthKey(new Date());
+    // 항상 모든 달에 적용되도록 'all'로 저장
+    const month = 'all';
+
+    // 기존의 해당 카테고리 예산들을 모두 삭제하여 중복 방지
+    await supabase.from('budgets').delete().eq('user_id', user.id).eq('category_id', data.category_id);
 
     const res = await supabase
       .from('budgets')
@@ -1120,7 +1131,8 @@ export const statsApi = {
         if (v.expense) dailyTrend.push({ date, type: 'expense', total: toIntMoney(v.expense) });
       });
 
-    const monthBudgets = bds.filter(b => b.month === m);
+    // 모든 달에 동일한 예산을 적용하므로, bds(이미 deduplicate된 budgets) 전체를 사용
+    const monthBudgets = bds;
     const spentByCategory = new Map<string, number>();
     for (const t of txs) {
       if (t.type !== 'expense') continue;

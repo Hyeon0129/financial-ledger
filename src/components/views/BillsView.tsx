@@ -60,7 +60,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         const paidByTx = memo && txMemoSet.has(memo);
 
         if (paidByTx) {
-          return { ...base, status: 'paid' as const, statusLabel: 'Paid' };
+          return { ...base, status: 'paid' as const, statusLabel: '완료' };
         }
 
         return base;

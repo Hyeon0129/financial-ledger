@@ -56,10 +56,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       const exp = yearlyExpense.find((e) => e.month === m)?.total || 0;
       const inc = yearlyIncome.find((i) => i.month === m)?.total || 0;
       const monthIdx = Number(m.split('-')[1]) - 1;
-      const label = new Date(year, monthIdx, 1).toLocaleDateString('en-US', { month: 'short' });
+      const label = `${monthIdx + 1}월`;
       return { month: label, monthNum: m.split('-')[1], expense: exp, income: inc, net: inc - exp };
     });
-  }, [monthKeys, year, yearly?.monthlyTrend]);
+  }, [monthKeys, yearly?.monthlyTrend]);
 
   const ytdIncome = yearlyCombined.reduce((sum, m) => sum + m.income, 0);
   const ytdExpense = yearlyCombined.reduce((sum, m) => sum + m.expense, 0);
@@ -253,8 +253,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
   );
 
   const budgetTotal = useMemo(
-    () => budgets.filter((b) => b.month === insightMonthKey).reduce((sum, b) => sum + (b.amount ?? 0), 0),
-    [budgets, insightMonthKey],
+    () => budgets.reduce((sum, b) => sum + (b.amount ?? 0), 0),
+    [budgets],
   );
   const budgetLeft = Math.max(0, budgetTotal - thisExpense);
   const budgetUsedRatePct = budgetTotal > 0 ? ((budgetTotal - budgetLeft) / budgetTotal) * 100 : 0;
@@ -420,44 +420,44 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
     <div className="reports-layout">
       <div className="reports-kpiGrid">
         <KPICard
-          title="YTD Income"
+          title="연간 수입"
           value={formatCurrency(ytdIncome, currency)}
           sub={
             <>
               <TrendPill dir={deltaPct(ytdIncome, prevTotals.income) >= 0 ? 'up' : 'down'} pct={deltaPct(ytdIncome, prevTotals.income)} />
-              <span className="dash-kpiSubText">from last year</span>
+              <span className="dash-kpiSubText">전년 대비</span>
             </>
           }
         />
         <KPICard
-          title="YTD Expense"
+          title="연간 지출"
           value={formatCurrency(ytdExpense, currency)}
           sub={
             <>
               <TrendPill dir={deltaPct(ytdExpense, prevTotals.expense) >= 0 ? 'up' : 'down'} pct={deltaPct(ytdExpense, prevTotals.expense)} />
-              <span className="dash-kpiSubText">from last year</span>
+              <span className="dash-kpiSubText">전년 대비</span>
             </>
           }
         />
         <KPICard
-          title="YTD Net"
+          title="연간 순증감"
           value={formatCurrency(ytdNet, currency)}
           sub={
             <>
               <TrendPill dir={deltaPct(ytdNet, prevTotals.net) >= 0 ? 'up' : 'down'} pct={deltaPct(ytdNet, prevTotals.net)} />
-              <span className="dash-kpiSubText">savings rate {savingsRate.toFixed(1)}%</span>
+              <span className="dash-kpiSubText">저축률 {savingsRate.toFixed(1)}%</span>
             </>
           }
         />
         <KPICard
-          title="Avg Monthly Expense"
+          title="평균 월 지출"
           value={formatCurrency(Math.round(avgMonthlyExpense), currency)}
-          sub={<span className="dash-kpiSubText">estimation</span>}
+          sub={<span className="dash-kpiSubText">추정치</span>}
         />
         <KPICard
-          title="Top Category (YTD)"
+          title="최다 지출(연간)"
           value={yearExpenseByCategory[0]?.name ?? '-'}
-          sub={<span className="dash-kpiSubText">{yearExpenseByCategory.length ? `${yearCatTopPct.toFixed(0)}% of expense` : '-'}</span>}
+          sub={<span className="dash-kpiSubText">{yearExpenseByCategory.length ? `지출의 ${yearCatTopPct.toFixed(0)}%` : '-'}</span>}
         />
       </div>
 
@@ -465,16 +465,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         <LiquidPanel className="interactive reports-yearPanel">
           <div className="reports-panelHeader">
             <div>
-              <div className="reports-panelTitle">Annual Income / Expense</div>
+              <div className="reports-panelTitle">연간 수입 / 지출</div>
               <div className="reports-panelSub">{year}</div>
             </div>
             <div className="reports-panelRight">
-              <div className="reports-yearNav" aria-label="Year navigation">
+              <div className="reports-yearNav" aria-label="연도 이동">
                 <button
                   className="reports-yearBtn"
                   type="button"
                   onClick={() => setYear((y) => y - 1)}
-                  aria-label="Previous year"
+                  aria-label="이전 연도"
                 >
                   ‹
                 </button>
@@ -483,7 +483,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
                   className="reports-yearBtn"
                   type="button"
                   onClick={() => setYear((y) => Math.min(new Date().getFullYear(), y + 1))}
-                  aria-label="Next year"
+                  aria-label="다음 연도"
                   disabled={year >= new Date().getFullYear()}
                 >
                   ›
@@ -492,10 +492,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
 
               <div className="reports-legend">
                 <span className="reports-legendItem">
-                  <span className="reports-legendDot income" /> Earning
+                  <span className="reports-legendDot income" /> 수입
                 </span>
                 <span className="reports-legendItem">
-                  <span className="reports-legendDot expense" /> Expenditure
+                  <span className="reports-legendDot expense" /> 지출
                 </span>
               </div>
             </div>
@@ -543,7 +543,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         <LiquidPanel className="interactive reports-catPanel">
           <div className="reports-panelHeader">
             <div>
-              <div className="reports-panelTitle">Expense by Category</div>
+              <div className="reports-panelTitle">카테고리별 지출</div>
               <div className="reports-panelSub">{year}</div>
             </div>
           </div>
@@ -601,7 +601,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
               </ResponsiveContainer>
               <div className="reports-pieCenter">
                 <div className="reports-piePct">{yearCatTopPct ? yearCatTopPct.toFixed(0) : '0'}%</div>
-                <div className="reports-pieLabel">top share</div>
+                <div className="reports-pieLabel">최고 비중</div>
               </div>
             </div>
             <div className="reports-pieLegend" aria-hidden={yearExpenseByCategory.length === 0}>
@@ -612,7 +612,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
                   <span className="reports-piePctSmall">{c.pct.toFixed(0)}%</span>
                 </div>
               ))}
-              {yearExpenseByCategory.length === 0 && <div className="reports-empty">No data</div>}
+              {yearExpenseByCategory.length === 0 && <div className="reports-empty">데이터가 없습니다.</div>}
             </div>
           </div>
         </LiquidPanel>
@@ -622,7 +622,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         <LiquidPanel className="interactive reports-tablePanel">
           <div className="reports-panelHeader">
             <div>
-              <div className="reports-panelTitle">Monthly Summary</div>
+              <div className="reports-panelTitle">월별 요약</div>
               <div className="reports-panelSub">{year}</div>
             </div>
           </div>
@@ -648,11 +648,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
         <LiquidPanel className="interactive reports-insightsPanel">
           <div className="reports-panelHeader">
             <div>
-              <div className="reports-panelTitle">Insights</div>
-              <div className="reports-panelSub">Quick read</div>
+              <div className="reports-panelTitle">인사이트</div>
+              <div className="reports-panelSub">요약</div>
             </div>
           </div>
-          <div className="reports-insightsBox" aria-label={`Insights for ${insightMonthKey}`}>
+          <div className="reports-insightsBox" aria-label={`${insightMonthKey} 인사이트`}>
             <div className="reports-insightsHeadline">{renderInsightText(insights.headline)}</div>
             <ul className="reports-insightsBullets">
               {insights.bullets.map((t) => (

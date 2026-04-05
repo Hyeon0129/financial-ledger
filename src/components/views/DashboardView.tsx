@@ -48,7 +48,7 @@ type BillsPreviewItem = {
   dueDate: string;
   amount: number;
   status: BillsPreviewStatus;
-  statusLabel: 'Paid' | 'Scheduled';
+  statusLabel: '완료' | '예정';
   group: BillsPreviewGroupKey;
   groupLabel?: string | null;
 };
@@ -75,7 +75,7 @@ const SmallKpiCard: React.FC<{
     <div className="dash-kpiValue">{value}</div>
     <div className="dash-kpiSub">
       {typeof trendPct === 'number' && trendDir ? <TrendPill dir={trendDir} pct={trendPct} /> : <span />}
-      <span className="dash-kpiSubText">vs last month</span>
+      <span className="dash-kpiSubText">지난달 대비</span>
     </div>
     {children}
   </LiquidPanel>
@@ -108,7 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalBudget = hasBudgetUsage
     ? budgetUsageTotal
-    : budgets.filter((b) => b.month === month).reduce((sum, b) => sum + b.amount, 0);
+    : budgets.reduce((sum, b) => sum + b.amount, 0);
   const budgetSpent = hasBudgetUsage ? budgetUsageSpent : expense;
   const budgetProgress = totalBudget > 0 ? (budgetSpent / totalBudget) * 100 : 0;
   const budgetRemaining = Math.max(0, totalBudget - budgetSpent);
@@ -189,7 +189,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return Array.from({ length: 12 }).map((_, i) => {
         const key = `${yy}-${String(i + 1).padStart(2, '0')}`;
         const val = map.get(key) ?? 0;
-        const name = new Date(yy, i, 1).toLocaleDateString('en-US', { month: 'short' });
+        const name = `${i + 1}월`;
         return { name, value: val };
       });
     }
@@ -219,7 +219,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       d.setDate(monday.getDate() + idx);
       const iso = getISO(d);
       const totals = dailyTotals.get(iso) ?? { income: 0, expense: 0 };
-      const name = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const name = dayNames[d.getDay()] ?? '';
       return { name, value: totals.expense };
     });
   }, [dailyTotals, month, range, stats, yearlyStats?.monthlyTrend]);
@@ -241,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const needleY = centerY - Math.sin(needleAngle) * needleR;
 
     return (
-      <div className="dash-speedoWrap" aria-label={`Monthly limit ${pct.toFixed(0)}%`}>
+      <div className="dash-speedoWrap" aria-label={`월 예산 사용률 ${pct.toFixed(0)}%`}>
         <svg className="dash-speedo" viewBox="0 0 260 170" role="img" aria-hidden="true">
           <path
             d="M34,140 A96,96 0 0 1 226,140"
@@ -350,7 +351,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           dueDate: base.dueDate,
           amount: base.amount,
           status,
-          statusLabel: (status === 'paid' ? 'Paid' : 'Scheduled') as 'Paid' | 'Scheduled',
+          statusLabel: (status === 'paid' ? '완료' : '예정') as '완료' | '예정',
           group: base.group as BillsPreviewGroupKey,
           groupLabel: base.groupLabel ?? null,
         };
@@ -387,7 +388,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           dueDate,
           amount,
           status,
-          statusLabel: (status === 'paid' ? 'Paid' : 'Scheduled') as 'Paid' | 'Scheduled',
+          statusLabel: (status === 'paid' ? '완료' : '예정') as '완료' | '예정',
           group: 'card',
           groupLabel: null,
         };
@@ -436,8 +437,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="dashboard-layout">
       <LiquidPanel className="interactive dash-chartPanel">
         <div className="dash-chartHeader">
-          <div className="dash-chartTitle">Expense Trend</div>
-          <div className="dash-rangeTabs" role="tablist" aria-label="Range">
+          <div className="dash-chartTitle">지출 추이</div>
+          <div className="dash-rangeTabs" role="tablist" aria-label="기간">
             {(['7D', '30D', 'YTD'] as const).map((k) => (
               <button
                 key={k}
@@ -515,38 +516,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <div className="dash-kpiGrid">
         <SmallKpiCard
-          title="Total Asset"
+          title="총 자산"
           value={formatCurrency(totalAssets, currency)}
           trendDir={balanceDelta.pct >= 0 ? 'up' : 'down'}
           trendPct={balanceDelta.pct}
         />
         <SmallKpiCard
-          title="Total Revenue"
+          title="총 수입"
           value={formatCurrency(income, currency)}
           trendDir={incomeDelta.pct >= 0 ? 'up' : 'down'}
           trendPct={incomeDelta.pct}
         />
         <SmallKpiCard
-          title="Total Expense"
+          title="총 지출"
           value={formatCurrency(expense, currency)}
           trendDir={expenseDelta.pct >= 0 ? 'up' : 'down'}
           trendPct={expenseDelta.pct}
         />
         <SmallKpiCard
-          title="Net Change"
+          title="순증감"
           value={formatCurrency(netChange, currency)}
           trendDir={netChangeDelta.pct >= 0 ? 'up' : 'down'}
           trendPct={netChangeDelta.pct}
         />
-        <SmallKpiCard title="Budget Left" value={formatCurrency(budgetRemaining, currency)} trendDir="up" trendPct={0} />
-        <SmallKpiCard title="Transactions" value={txCount} trendDir="up" trendPct={0} />
+        <SmallKpiCard title="예산 잔액" value={formatCurrency(budgetRemaining, currency)} trendDir="up" trendPct={0} />
+        <SmallKpiCard title="거래 수" value={txCount} trendDir="up" trendPct={0} />
       </div>
 
       <LiquidPanel className="interactive dash-limitPanel">
         <div className="dash-subHeader">
-          <div className="dash-subTitle">Monthly Limit</div>
+          <div className="dash-subTitle">월 예산</div>
           <div className="dash-limitHeaderRight">
-            <div className="dash-limitLabel">Budget Left</div>
+            <div className="dash-limitLabel">예산 잔액</div>
             <div className="dash-limitValue">{formatCurrency(budgetRemaining, currency)}</div>
           </div>
         </div>
@@ -558,9 +559,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <LiquidPanel className="interactive dash-activityPanel">
         <div className="dash-subHeader">
-          <div className="dash-subTitle">Recent Spending</div>
+          <div className="dash-subTitle">최근 소비</div>
           <button className="dash-linkBtn" type="button" onClick={() => onNavigate('transactions')}>
-            View details
+            자세히 보기
           </button>
         </div>
         <div className="dash-activityGrid">
@@ -579,23 +580,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <div className="dash-recentColDate">{formatDate(t.date)}</div>
                     <div className="dash-recentColCat">
                       <span className="dash-recentDot" style={{ background: t.category_color || 'rgba(255,255,255,0.18)' }} />
-                      <span className="dash-recentCatName">{t.category_name || 'Uncategorized'}</span>
+                      <span className="dash-recentCatName">{t.category_name || '미분류'}</span>
                     </div>
                     <div className="dash-recentColAmt">{formatCurrency(t.amount, currency)}</div>
                     <div className="dash-recentColAcc">{t.account_name || '-'}</div>
                     <div className="dash-recentColMemo">{t.memo || '-'}</div>
                   </div>
                 ))}
-                {recentExpensesAll.length === 0 && <div className="dash-empty">No expenses</div>}
+                {recentExpensesAll.length === 0 && <div className="dash-empty">지출 내역이 없습니다.</div>}
               </div>
             </div>
-            <div className="dash-recentPager" aria-label="Recent spending pagination">
+            <div className="dash-recentPager" aria-label="최근 소비 페이지네이션">
               <button
                 className="dash-pagerBtn"
                 type="button"
                 onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
                 disabled={recentPageSafe <= 1}
-                aria-label="Previous"
+                aria-label="이전"
               >
                 ‹
               </button>
@@ -607,7 +608,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 type="button"
                 onClick={() => setRecentPage((p) => Math.min(recentTotalPages, p + 1))}
                 disabled={recentPageSafe >= recentTotalPages}
-                aria-label="Next"
+                aria-label="다음"
               >
                 ›
               </button>
@@ -616,8 +617,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="dash-donutBox">
             <div className="dash-subHeader" style={{ marginBottom: 10 }}>
-              <div className="dash-subTitle">By Category</div>
-              <div className="dash-subHint">expenses</div>
+              <div className="dash-subTitle">카테고리별</div>
+              <div className="dash-subHint">지출</div>
             </div>
             <div className="dash-donutWrap">
               <div className="dash-donutChart">
@@ -672,7 +673,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 	                </ResponsiveContainer>
                 <div className="dash-donutCenter">
                   <div className="dash-donutPct">{largestCategoryPct.toFixed(0)}%</div>
-                  <div className="dash-donutLabel">top category</div>
+                  <div className="dash-donutLabel">최다 지출</div>
                 </div>
               </div>
               <div className="dash-donutLegend">
@@ -683,7 +684,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="dash-legendPct">{c.pct.toFixed(0)}%</span>
                   </div>
                 ))}
-                {categoryData.length === 0 && <div className="dash-empty">No data</div>}
+                {categoryData.length === 0 && <div className="dash-empty">데이터가 없습니다.</div>}
               </div>
             </div>
           </div>
@@ -692,9 +693,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <LiquidPanel className="interactive dash-billsPanel">
         <div className="dash-billsHeader">
-          <div className="dash-subTitle">Bill &amp; Payment</div>
+          <div className="dash-subTitle">고정지출</div>
           <button className="dash-linkBtn" type="button" onClick={() => onNavigate('bills')}>
-            View All
+            전체 보기
           </button>
         </div>
 
@@ -714,7 +715,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
           ))}
-          {billsPreview.length === 0 && <div className="dash-empty">No bills</div>}
+          {billsPreview.length === 0 && <div className="dash-empty">고정지출이 없습니다.</div>}
         </div>
       </LiquidPanel>
     </div>

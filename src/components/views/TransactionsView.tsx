@@ -95,7 +95,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     () => (selectedDate ? (transactionsByDate[selectedDate] ?? []) : []),
     [selectedDate, transactionsByDate],
   );
-  const today = new Date().toISOString().split('T')[0];
+  const today = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
 
   const selectedDaySummary = useMemo(() => {
     const summary = { income: 0, expense: 0, transfer: 0 };
@@ -110,7 +116,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   return (
     <>
       <div className="transactions-toolbar">
-        <h2 className="panel-title">Transactions</h2>
+        <h2 className="panel-title">거래 내역</h2>
         <button className="btn btn-primary" onClick={() => { setEditingTransaction(null); setShowForm(true); }}>
           <Icons.Plus /> 새 거래
         </button>
@@ -147,7 +153,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     ))}
                     {dayTransactions.length > 3 && (
                       <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                        +{dayTransactions.length - 3} more
+                        +{dayTransactions.length - 3}건 더
                       </div>
                     )}
                   </div>
@@ -199,7 +205,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           {t.type === 'income' ? '수입' : t.type === 'expense' ? '지출' : '이체'}
                         </span>
                       </div>
-                      <div className="tx-dayCol-cat">{t.category_name || 'Uncategorized'}</div>
+                      <div className="tx-dayCol-cat">{t.category_name || '미분류'}</div>
                       <div className={`tx-dayCol-amt ${t.type}`}>
                         {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}
                         {formatCurrency(t.amount, currency)}

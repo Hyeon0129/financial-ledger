@@ -10,6 +10,7 @@ interface AccountCardProps {
   className?: string;
   monthlySpend?: number;
   userEmail?: string;
+  userName?: string;
 }
 
 const getPresetByIndex = (index: number) => {
@@ -34,6 +35,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   className,
   monthlySpend,
   userEmail,
+  userName,
 }) => {
   const meta = loadAccountMeta();
   const kind = meta[account.id]?.kind ?? inferKindFallback(account.type);
@@ -42,7 +44,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const icon = getIconByName(account.name || '');
   const remaining = Number(account.balance) || 0;
   const spent = Number(monthlySpend) || 0;
-  const holder = (userEmail || '-').split('@')[0] || '-';
+  const holder = (userName?.trim() || (userEmail || '-').split('@')[0] || '-').trim() || '-';
   const creditLimit = cardMeta && cardMeta.kind === 'credit_card' ? Number(cardMeta.creditLimit) || 0 : 0;
 
   return (
@@ -64,18 +66,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
       <div className="card-bottom">
         <div className="card-block">
-          <div className="card-label">Holder</div>
+          <div className="card-label">소유자</div>
           <div className="card-val holder">{holder}</div>
         </div>
 
         <div className="card-block">
-          <div className="card-label">{kind === 'credit_card' ? 'Limit' : 'Remaining'}</div>
+          <div className="card-label">{kind === 'credit_card' ? '한도' : '잔액'}</div>
           <div className="card-val">
             {formatCurrency(kind === 'credit_card' ? creditLimit : remaining, currency)}
           </div>
         </div>
         <div className="card-block">
-          <div className="card-label">This month spent</div>
+          <div className="card-label">이번 달 사용</div>
           <div className="card-val">{formatCurrency(spent, currency)}</div>
         </div>
       </div>

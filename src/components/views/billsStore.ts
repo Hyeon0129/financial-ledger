@@ -30,8 +30,8 @@ const STORAGE_KEY = 'my-ledger:bills:v3';
 const LEGACY_KEYS = ['my-ledger:bills:v2', 'my-ledger:bills:v1'] as const;
 
 const statusLabel = (status: BillStatus) => {
-  if (status === 'paid') return 'Paid';
-  return 'Scheduled';
+  if (status === 'paid') return '완료';
+  return '예정';
 };
 
 const parseISODate = (iso: string) => {

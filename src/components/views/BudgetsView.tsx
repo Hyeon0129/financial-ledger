@@ -26,7 +26,8 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     return categories.filter((c) => c.type === 'expense' && !hasChild.has(c.id));
   }, [categories]);
 
-  const budgetsForMonth = useMemo(() => budgets.filter((b) => b.month === month), [budgets, month]);
+  // api.ts에서 이미 모든 달에 적용되는 예산을 카테고리별로 1개씩만 반환하므로 필터링 불필요
+  const budgetsForMonth = useMemo(() => budgets, [budgets]);
 
   const expenseSpentMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -39,14 +40,43 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     return map;
   }, [month, transactions]);
 
+  const validSelectOptions = useMemo(() => {
+    const opts: { isOptGroup: boolean; id: string; name: string; kids?: Category[] }[] = [];
+    const parents = categories.filter((p) => p.type === 'expense' && !p.parent_id);
+    
+    parents.forEach((parent) => {
+      const kids = leafExpenseCategories.filter((c) => c.parent_id === parent.id);
+      if (kids.length > 0) {
+        opts.push({ isOptGroup: true, id: parent.id, name: parent.name, kids });
+      } else if (leafExpenseCategories.some((c) => c.id === parent.id)) {
+        opts.push({ isOptGroup: false, id: parent.id, name: parent.name });
+      }
+    });
+
+    const orphans = leafExpenseCategories.filter(
+      (c) => c.parent_id && !categories.some((p) => p.id === c.parent_id)
+    );
+    orphans.forEach((c) => opts.push({ isOptGroup: false, id: c.id, name: c.name }));
+
+    return opts;
+  }, [categories, leafExpenseCategories]);
+
+  const defaultCategoryId = useMemo(() => {
+    for (const opt of validSelectOptions) {
+      if (!opt.isOptGroup) return opt.id;
+      if (opt.kids && opt.kids.length > 0) return opt.kids[0].id;
+    }
+    return '';
+  }, [validSelectOptions]);
+
   const [showModal, setShowModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [categoryId, setCategoryId] = useState(() => leafExpenseCategories[0]?.id ?? '');
+  const [categoryId, setCategoryId] = useState('');
   const [amount, setAmount] = useState('');
 
   const openCreate = () => {
     setEditingBudget(null);
-    setCategoryId(leafExpenseCategories[0]?.id ?? '');
+    setCategoryId(defaultCategoryId);
     setAmount('');
     setShowModal(true);
   };
@@ -58,7 +88,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     setShowModal(true);
   };
 
-  const budgetOrderKey = useMemo(() => `my-ledger:budgets-order:${month}`, [month]);
+  const budgetOrderKey = useMemo(() => `my-ledger:budgets-order-global`, []);
   const [budgetOrder, setBudgetOrder] = useState<string[]>([]);
   const [draggingBudgetCatId, setDraggingBudgetCatId] = useState<string | null>(null);
   const [dragOverBudgetCatId, setDragOverBudgetCatId] = useState<string | null>(null);
@@ -290,7 +320,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
             <input
               className="budgets-search"
               type="search"
-              placeholder="Search..."
+              placeholder="검색..."
               value={expenseQuery}
               onChange={(e) => {
                 setExpenseQuery(e.target.value);
@@ -300,7 +330,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           </div>
           <div className="budgets-toolbar">
             <div className="budgets-toolbar-left">
-              <span>Show</span>
+              <span>표시</span>
               <div className="budgets-selectWrap">
                 <select
                   className="budgets-select"
@@ -319,7 +349,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                   <Icons.ChevronDown />
                 </div>
               </div>
-              <span>entries</span>
+              <span>개</span>
             </div>
           </div>
           <div className="transactions-table-lite budgets-expense-table manage-table">
@@ -347,15 +377,15 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           </div>
           <div className="budgets-foot">
             <div className="budgets-rangeInfo">
-              Showing {expenseShowingFrom} to {expenseShowingTo} of {expenseFiltered.length} entries
+              총 {expenseFiltered.length}건 중 {expenseShowingFrom}~{expenseShowingTo}건 표시
             </div>
-            <div className="budgets-pager" aria-label="Expense table pagination">
+            <div className="budgets-pager" aria-label="지출 내역 페이지네이션">
               <button
                 className="budgets-pagerBtn"
                 type="button"
                 onClick={() => setExpensePage((p) => Math.max(1, p - 1))}
                 disabled={expensePageSafe <= 1}
-                aria-label="Previous"
+                aria-label="이전"
               >
                 ‹
               </button>
@@ -367,7 +397,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                 type="button"
                 onClick={() => setExpensePage((p) => Math.min(expenseTotalPages, p + 1))}
                 disabled={expensePageSafe >= expenseTotalPages}
-                aria-label="Next"
+                aria-label="다음"
               >
                 ›
               </button>
@@ -393,21 +423,24 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
               <div className="form-group">
                 <label className="form-label">카테고리</label>
                 <select className="form-select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  {categories
-                    .filter((p) => p.type === 'expense' && !p.parent_id)
-                    .map((parent) => {
-                      const leafChildren = leafExpenseCategories.filter((c) => c.parent_id === parent.id);
-                      if (leafChildren.length === 0) return null;
+                  {validSelectOptions.map((opt) => {
+                    if (opt.isOptGroup && opt.kids) {
                       return (
-                        <optgroup key={parent.id} label={parent.name}>
-                          {leafChildren.map((c) => (
+                        <optgroup key={opt.id} label={opt.name}>
+                          {opt.kids.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.name}
                             </option>
                           ))}
                         </optgroup>
                       );
-                    })}
+                    }
+                    return (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.name}
+                      </option>
+                    );
+                  })}
                 </select>
                 {editingBudget && (
                   <div className="panel-sub" style={{ marginTop: 8 }}>

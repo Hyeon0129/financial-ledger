@@ -15,12 +15,13 @@ interface AccountsViewProps {
   categories: Category[];
   loans: Loan[];
   userEmail: string;
+  userName?: string;
   onRefresh: () => void;
   onRefreshLoans: () => void;
 }
 
 export const AccountsView: React.FC<AccountsViewProps> = ({ 
-  accounts, currency, monthlySpend, categories, loans, userEmail, onRefresh, onRefreshLoans 
+  accounts, currency, monthlySpend, categories, loans, userEmail, userName, onRefresh, onRefreshLoans 
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -36,10 +37,10 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
     await onRefreshLoans();
   };
 
-  return (
+      return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 className="panel-title">My Accounts</h2>
+        <h2 className="panel-title">계좌</h2>
         <button className="btn btn-primary" onClick={() => { setEditingAccount(null); setShowForm(true); }}>
           <Icons.Plus /> 새 계좌
         </button>
@@ -54,13 +55,14 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
               currency={currency}
               monthlySpend={monthlySpend[account.id] || 0}
               userEmail={userEmail}
+              userName={userName}
             />
           </div>
         ))}
       </div>
 
       <div style={{ marginTop: 40, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="panel-title">Loans</h2>
+        <h2 className="panel-title">대출</h2>
         <button className="btn btn-primary" onClick={() => { setEditingLoan(null); setShowLoanForm(true); }}>
           <Icons.Plus /> 새 대출
         </button>
