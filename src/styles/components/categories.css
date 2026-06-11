@@ -81,11 +81,17 @@
 
 .cat-row {
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  font-size: 15px;
-  color: rgba(255,255,255,0.78);
+  font-size: 16px;
+  color: rgba(255,255,255,0.85);
+  background: transparent;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 .cat-row:last-child { border-bottom: none; }
-.cat-row:hover { background: rgba(255,255,255,0.03); }
+.cat-row:hover {
+  background: transparent;
+  transform: translateY(-2px);
+  color: rgba(255,255,255,1);
+}
 
 .cat-col-name {
   display: inline-flex;
@@ -93,6 +99,13 @@
   gap: 10px;
   min-width: 0;
   flex: 1;
+}
+
+.cat-hover-group {
+  transition: transform 0.2s ease;
+}
+.cat-hover-group:hover {
+  transform: translateY(-2px);
 }
 
 .cat-dot {
@@ -115,6 +128,7 @@
   align-items: center;
   gap: 10px;
   flex: 0 0 auto;
+  justify-content: center;
 }
 
 /* Expense grid (no nested table/card) */
@@ -148,19 +162,25 @@
   text-transform: uppercase;
   color: rgba(255,255,255,0.92);
   border-bottom: 1px solid rgba(255,255,255,0.10);
-  background: rgba(0,0,0,0.12);
+  background: transparent;
 }
 
 .cat-gridRow {
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.78);
-  font-size: 15px;
+  color: rgba(255,255,255,0.85);
+  font-size: 16px;
+  background: transparent;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 .cat-gridRow:last-child { border-bottom: none; }
-.cat-gridRow:hover { background: rgba(255,255,255,0.03); }
+.cat-gridRow:hover {
+  background: transparent;
+  transform: translateY(-2px);
+  color: rgba(255,255,255,1);
+}
 
 .cat-gridRow.is-parent {
-  background: rgba(255,255,255,0.02);
+  background: transparent;
 }
 
 .cat-grid .cat-col-parent,
@@ -179,7 +199,7 @@
 }
 
 .cat-grid .cat-col-actions {
-  justify-content: flex-end;
+  justify-content: center;
   gap: 12px;
 }
 

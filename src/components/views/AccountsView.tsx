@@ -39,8 +39,7 @@ export const AccountsView: React.FC<AccountsViewProps> = ({
 
       return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 className="panel-title">계좌</h2>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 }}>
         <button className="btn btn-primary" onClick={() => { setEditingAccount(null); setShowForm(true); }}>
           <Icons.Plus /> 새 계좌
         </button>

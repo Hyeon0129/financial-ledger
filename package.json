@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "db:init": "echo \"db:init 비활성화됨\"",
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
     "build": "tsc && vite build",
     "electron": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "vite build && electron-builder"

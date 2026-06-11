@@ -1,5 +1,6 @@
 // Main App Component
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { supabase } from './lib/supabase'
 import AuthTest from './components/AuthTest'
 import appLogo from './assets/mac_black.jpg';
 import type {
@@ -56,9 +57,33 @@ const App: React.FC = () => {
 
   // Authentication Setup
   useEffect(() => {
-    setIsLoggedIn(true);
-    setAuthReady(true);
+    let mounted = true;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) console.error('Auth error:', error);
+      setIsLoggedIn(!!data.session);
+      setAuthReady(true);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+      setAuthReady(true);
+    });
+    return () => {
+      mounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const ensureProfile = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        await supabase.from('profiles').upsert({ id: data.user.id, email: data.user.email ?? '' }, { onConflict: 'id' });
+      }
+    };
+    ensureProfile();
+  }, [isLoggedIn]);
 
   // App State
   const [view, setView] = useState<View>('dashboard');
@@ -454,7 +479,7 @@ const App: React.FC = () => {
       case 'budgets': return '예산 설정 및 관리';
       case 'accounts': return '내 자산과 계좌 현황';
       case 'bills': return '정기 결제/납부 관리';
-      default: return '가계부 현황';
+      default: return 'Finance Overview';
     }
   };
 
@@ -562,22 +587,9 @@ const App: React.FC = () => {
             <LiquidPanel className="sidebar-panel" contentClassName="sidebar-panel-content">
               
               <div className="sidebar-header">
-                <div className="app-logo" style={{ 
-                  borderRadius: '50%', 
-                  backgroundImage: userProfile?.avatar_url ? `url("${userProfile.avatar_url}")` : undefined,
-                  background: !userProfile?.avatar_url ? 'rgba(255,255,255,0.1)' : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  fontWeight: 'bold',
-                  overflow: 'hidden'
-                }}>
-                  {!userProfile?.avatar_url && (userProfile?.name?.trim() || userProfile?.email || 'U').slice(0, 1).toUpperCase()}
-                </div>
+                <img className="app-logo" src={appLogo} alt="" aria-hidden="true" />
                 <div className="user-info">
-                  <h3>{userProfile?.name || 'My Ledger'}</h3>
+                  <h3>My Ledger</h3>
                   <span>가계부</span>
                 </div>
               </div>
@@ -598,8 +610,8 @@ const App: React.FC = () => {
                 <NavItem viewKey="transactions" label="거래 내역" active={view === 'transactions'} iconPath="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.15a16,16,0,0,0-8.32,14v95.7a16,16,0,0,0,8.32,14l88,48.15a15.88,15.88,0,0,0,15.36,0l88-48.15a16,16,0,0,0,8.32-14V80.15A16,16,0,0,0,223.68,66.15Zm-103.36-32,80,43.77L128,117.26,55.68,77.92Zm-7.68,173.7-80-43.77V76.31l80,43.77ZM144,191.85V120.08l80-43.77v87.84Z" />
                 <NavItem viewKey="categories" label="카테고리" active={view === 'categories'} iconPath="M40,128a88,88,0,1,1,88,88A88.1,88.1,0,0,1,40,128Zm88-72a72,72,0,1,0,72,72A72.08,72.08,0,0,0,128,56Zm16,112a8,8,0,0,1-16,0V136a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H144Z" />
                 <NavItem viewKey="accounts" label="계좌" active={view === 'accounts'} iconPath="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V72H40V56Zm0,144H40V88H216V200Zm-24-40a8,8,0,1,1-8-8A8,8,0,0,1,192,160Z" />
-                <NavItem viewKey="budgets" label="예산" active={view === 'budgets'} iconPath="M216,72H182.43L170.89,37.36a16,16,0,0,0-30.34,1.35L128,88.38,115.45,38.71a16,16,0,0,0-30.9,0L68.83,104H40a8,8,0,0,0,0,16H76.47l12.75-42.5,12.23,48.29A16,16,0,0,0,117,137.64l1.45-.18A16,16,0,0,0,131.56,125l12.89-51.11L156.17,120H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16H172.66l-4.78-19.11L188,73.11V184a8,8,0,0,1-8,8H72a8,8,0,0,1-8-8V152a8,8,0,0,0-16,0v32a24,24,0,0,0,24,24H180a24,24,0,0,0,24-24V88h12a8,8,0,0,0,0-16Z" />
-                <NavItem viewKey="reports" label="리포트" active={view === 'reports'} iconPath="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48ZM216,192H40V64H216V192ZM48,96a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,96Zm0,32a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H56A8,8,0,0,1,48,160Z" />
+                <NavItem viewKey="budgets" label="예산" active={view === 'budgets'} iconPath="M216,72H182.43L170.89,37.36a16,16,0,0,0-30.34,1.35L128,88.38,115.45,38.71a16,16,0,0,0-30.9,0L68.83,104H40a8,8,0,0,0,0,16H76.47l12.75-42.5,12.23,48.29A16,16,0,0,0,117,137.64l1.45-.18A16,16,0,0,0,131.56,125l12.89-51.11L156.17,120H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16H172.66l-4.78-19.11L188,73.11V184a8,8,0,0,1-8,8H72a8,8,0,0,1-8-8V152a8,8,0,0,0-16,0v32a24,24,0,0,0,24,24H180a24,24,0,0,0,24-24V88h12a8,8,0,0,0,0-16Z" badge={{text:'16', style:{}}} />
+                <NavItem viewKey="reports" label="리포트" active={view === 'reports'} iconPath="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48ZM216,192H40V64H216V192ZM48,96a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,96Zm0,32a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H56A8,8,0,0,1,48,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H56A8,8,0,0,1,48,160Z" badge={{text:'신규', style:{background:'#e65100'}}} />
                 <NavItem viewKey="bills" label="고정지출" active={view === 'bills'} iconPath="M208,40H48A16,16,0,0,0,32,56V200a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40ZM48,56H208V80H48Zm160,144H48V96H208v104Zm-28-72H76a8,8,0,0,1,0-16H180a8,8,0,0,1,0,16Zm0,40H76a8,8,0,0,1,0-16H180a8,8,0,0,1,0,16Z" />
                 <NavItem viewKey="savings" label="저축 목표" active={view === 'savings'} iconPath="M224,112h-8V80a16,16,0,0,0-16-16H168V48a16,16,0,0,0-16-16H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V128h8a8,8,0,0,0,0-16ZM152,48v16H48V48Zm0,32v32H48V80Zm-88,48v80H48V128Zm16,80V128h72v80Zm128,0H168v-8a8,8,0,0,0-8-8H160a24,24,0,0,0-24-24h16V80h48v32h8a8,8,0,0,0,0,16h-8v64h8a8,8,0,0,0,0,16Z" />
                 {/* 설정/로그아웃은 상단 우측 프로필 메뉴에서 제공합니다. */}
@@ -640,9 +652,6 @@ const App: React.FC = () => {
                           className="profileAvatar"
                           style={{
                             backgroundImage: userProfile?.avatar_url ? `url(${userProfile.avatar_url})` : undefined,
-                            backgroundColor: !userProfile?.avatar_url ? 'rgba(255,255,255,0.1)' : undefined,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
                           }}
                         >
                           {!userProfile?.avatar_url && (
@@ -667,9 +676,9 @@ const App: React.FC = () => {
                           <button
                             type="button"
                             className="profileMenuItem danger"
-                            onClick={() => {
+                            onClick={async () => {
                               setShowProfileMenu(false);
-                              // await supabase.auth.signOut();
+                              await supabase.auth.signOut();
                             }}
                           >
                             로그아웃
@@ -884,18 +893,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         {!avatarUrl && <span>{(name.trim() || user?.email || 'U').slice(0, 1).toUpperCase()}</span>}
                       </div>
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <input className="form-input" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="이미지 URL 직접 입력" />
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          <label className="btn btn-secondary" style={{ cursor: 'pointer', flex: 1, justifyContent: 'center' }}>
-                            PC에서 사진 선택
-                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])} />
-                          </label>
-                          {avatarUrl && (
-                            <button type="button" className="btn btn-danger" onClick={() => setAvatarUrl('')}>
-                              삭제
-                            </button>
-                          )}
-                        </div>
+                        <input className="form-input" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="이미지 URL 또는 파일 업로드" />
+                        <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])} />
                       </div>
                     </div>
                   </div>

@@ -51,6 +51,7 @@ type BillsPreviewItem = {
   statusLabel: '완료' | '예정';
   group: BillsPreviewGroupKey;
   groupLabel?: string | null;
+  iconUrl?: string | null;
 };
 
 type BillsPreviewGroup = { groupKey: BillsPreviewGroupKey; groupTitle: string; items: BillsPreviewItem[] };
@@ -354,6 +355,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           statusLabel: (status === 'paid' ? '완료' : '예정') as '완료' | '예정',
           group: base.group as BillsPreviewGroupKey,
           groupLabel: base.groupLabel ?? null,
+          iconUrl: base.iconUrl ?? null,
         };
       })
       .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
@@ -558,13 +560,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </LiquidPanel>
 
       <LiquidPanel className="interactive dash-activityPanel">
-        <div className="dash-subHeader">
+        <div className="dash-subHeader" style={{ marginBottom: 32 }}>
           <div className="dash-subTitle">최근 소비</div>
           <button className="dash-linkBtn" type="button" onClick={() => onNavigate('transactions')}>
             자세히 보기
           </button>
-        </div>
-        <div className="dash-activityGrid">
+        </div>        <div className="dash-activityGrid">
           <div className="dash-recentTableWrap">
             <div className="dash-recentScroll">
               <div className="dash-recentHead">
@@ -700,21 +701,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="dash-billsBody">
-          {billsPreview.map((g) => (
-            <div key={g.groupKey} className="dash-billGroup">
-              <div className="dash-billGroupTitle">{g.groupTitle}</div>
-              <div className="dash-billRows">
-                {g.items.map((b) => (
-                  <div key={b.id} className="dash-billItem">
-                    <div className="dash-billItemName">{b.name}</div>
-                    <div className="dash-billItemDue">{formatDateShort(b.dueDate)}</div>
-                    <div className="dash-billItemAmount">{formatCurrency(b.amount, currency)}</div>
-                    <div className={`dash-billItemStatus ${b.status}`}>{b.statusLabel}</div>
-                  </div>
-                ))}
+          <div className="dash-billRowHead">
+            <div className="dash-billCol-icon" />
+            <div className="dash-billCol-cat">분류</div>
+            <div className="dash-billCol-item">아이템</div>
+            <div className="dash-billCol-date">날짜</div>
+            <div className="dash-billCol-amt">금액</div>
+            <div className="dash-billCol-status">상태</div>
+          </div>
+          {(() => {
+            const allItems = billsPreview.flatMap(g => g.items.map(b => ({ ...b, groupTitle: g.groupTitle })));
+            return allItems.map((b) => {
+              const hasIcon = !!b.iconUrl && b.iconUrl.trim().length > 0;
+              const iconUrl = hasIcon ? b.iconUrl : null;
+              const bg = hasIcon ? 'transparent' : 'rgba(255,255,255,0.06)';
+              const letter = hasIcon ? '' : (b.name.trim()[0] || '?').toUpperCase();
+              
+              return (
+              <div key={b.id} className="dash-billItem">
+                <div className="dash-billItemIcon" style={{ 
+                  backgroundImage: iconUrl ? `url("${iconUrl}")` : 'none',
+                  backgroundSize: 'cover', 
+                  backgroundPosition: 'center',
+                  backgroundColor: bg
+                }}>{letter}</div>
+                <div className="dash-billItemCat" data-group={b.group}>{b.groupTitle}</div>
+                <div className="dash-billItemName">
+                  <div style={{ lineHeight: 1.2 }}>{b.name}</div>
+                  {b.accountName && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{b.accountName}</div>}
+                </div>
+                <div className="dash-billItemDue">{formatDateShort(b.dueDate)}</div>
+                <div className="dash-billItemAmount">{formatCurrency(b.amount, currency)}</div>
+                <div className="dash-billItemStatus">
+                  <span className={`dash-billItemStatus-pill ${b.status}`}>{b.statusLabel}</span>
+                </div>
               </div>
-            </div>
-          ))}
+              );
+            });
+          })()}
           {billsPreview.length === 0 && <div className="dash-empty">고정지출이 없습니다.</div>}
         </div>
       </LiquidPanel>

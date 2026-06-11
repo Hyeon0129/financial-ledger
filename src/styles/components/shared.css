@@ -68,6 +68,7 @@ body[data-theme="light"] .modal-overlay {
   max-height: 90vh;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: none;
   box-shadow:
     0 32px 64px rgba(0, 0, 0, 0.44),
     0 8px 32px rgba(0, 0, 0, 0.22),
@@ -80,6 +81,9 @@ body[data-theme="light"] .modal-overlay {
   gap: var(--space-6);
   position: relative;
   isolation: isolate;
+}
+.modal-content::-webkit-scrollbar {
+  display: none;
 }
 
 .modal-content::before {
@@ -155,20 +159,18 @@ body[data-theme="light"] .modal-content {
   flex-wrap: wrap;
 }
 
-.modal-content::-webkit-scrollbar {
-  width: 6px;
+/* ========== Drag and Drop ========== */
+.is-dragging {
+  opacity: 0.65;
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.30);
+  z-index: 10;
+  position: relative;
 }
 
-.modal-content::-webkit-scrollbar-track {
-  background: transparent;
+.is-dropTarget {
+  border-top: 2px solid var(--accent-blue);
 }
-
-.modal-content::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
-  border-radius: 10px;
-}
-
-/* ========== Settings Modal ========== */
 .settingsModal {
   max-width: 860px;
 }
@@ -235,24 +237,29 @@ body[data-theme="light"] .settingsSectionTitle {
 
 .settingsAvatarRow {
   display: flex;
-  gap: 14px;
+  gap: 20px;
   align-items: center;
+  background: rgba(255,255,255,0.02);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.05);
 }
 
 .settingsAvatarPreview {
-  width: 64px;
-  height: 64px;
-  border-radius: 22px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.16);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.2);
   background-size: cover;
   background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(var(--text) / 0.92);
-  font-weight: 850;
-  font-size: 18px;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   flex-shrink: 0;
 }
 

@@ -1,7 +1,8 @@
 // Reports View (Analytics)
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Budget, Category, MonthlyStats } from '../../api';
-import { categoriesApi, formatCurrency, statsApi, transactionsApi } from '../../api';
+import type { Budget, Category, MonthlyStats, Transaction } from '../../api';
+import { categoriesApi, formatCurrency, statsApi } from '../../api';
+import { supabase } from '../../lib/supabase';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { LiquidPanel } from '../common/LiquidPanel';
 
@@ -146,6 +147,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       setInsightStats(m);
       setInsightPrevStats(pm);
 
+      const userRes = await supabase.auth.getUser();
+      const userId = userRes.data.user?.id;
+      if (!userId) {
+        setYearExpenseByCategory([]);
+        setYearCatTopPct(0);
+        return;
+      }
+
       const catMap = new Map(catsRes.map((c) => [c.id, c]));
       const rootOf = (id: string): Category | null => {
         let cur = catMap.get(id) ?? null;
@@ -160,13 +169,32 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       };
 
       const totals = new Map<string, number>();
-      const txRes = await transactionsApi.list({ year: targetYear });
-      for (const t of txRes) {
-        if (t.type !== 'expense') continue;
-        const raw = t.category_id ?? 'uncat';
-        const root = raw === 'uncat' ? null : rootOf(raw);
-        const key = root?.id ?? raw;
-        totals.set(key, (totals.get(key) ?? 0) + (Number(t.amount) || 0));
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const to = from + pageSize - 1;
+        const res = await supabase
+          .from('transactions')
+          .select('type,amount,category_id,date')
+          .eq('user_id', userId)
+          .like('date', `${targetYear}-%`)
+          .range(from, to)
+          .order('date', { ascending: true });
+
+        if (res.error) throw new Error(res.error.message);
+        const rows = (res.data ?? []) as Array<Pick<Transaction, 'type' | 'amount' | 'category_id' | 'date'>>;
+        if (rows.length === 0) break;
+
+        for (const t of rows) {
+          if (t.type !== 'expense') continue;
+          const raw = t.category_id ?? 'uncat';
+          const root = raw === 'uncat' ? null : rootOf(raw);
+          const key = root?.id ?? raw;
+          totals.set(key, (totals.get(key) ?? 0) + (Number(t.amount) || 0));
+        }
+
+        if (rows.length < pageSize) break;
+        from += pageSize;
       }
 
       const items = Array.from(totals.entries())
@@ -434,7 +462,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       </div>
 
       <div className="reports-mainGrid">
-        <LiquidPanel className="interactive reports-yearPanel" style={{ height: '100%' }}>
+        <LiquidPanel className="interactive reports-yearPanel">
           <div className="reports-panelHeader">
             <div>
               <div className="reports-panelTitle">연간 수입 / 지출</div>
@@ -512,7 +540,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
           </div>
         </LiquidPanel>
 
-        <LiquidPanel className="interactive reports-catPanel" style={{ height: '100%' }}>
+        <LiquidPanel className="interactive reports-catPanel">
           <div className="reports-panelHeader">
             <div>
               <div className="reports-panelTitle">카테고리별 지출</div>
@@ -591,7 +619,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
       </div>
 
       <div className="reports-bottomGrid">
-        <LiquidPanel className="interactive reports-tablePanel" style={{ height: '100%' }}>
+        <LiquidPanel className="interactive reports-tablePanel">
           <div className="reports-panelHeader">
             <div>
               <div className="reports-panelTitle">월별 요약</div>
@@ -617,7 +645,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ stats, yearlyStats, bu
           </div>
         </LiquidPanel>
 
-        <LiquidPanel className="interactive reports-insightsPanel" style={{ height: '100%' }}>
+        <LiquidPanel className="interactive reports-insightsPanel">
           <div className="reports-panelHeader">
             <div>
               <div className="reports-panelTitle">인사이트</div>

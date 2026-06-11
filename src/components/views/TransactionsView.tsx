@@ -116,7 +116,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   return (
     <>
       <div className="transactions-toolbar">
-        <h2 className="panel-title">거래 내역</h2>
+        <div />
         <button className="btn btn-primary" onClick={() => { setEditingTransaction(null); setShowForm(true); }}>
           <Icons.Plus /> 새 거래
         </button>
@@ -205,7 +205,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           {t.type === 'income' ? '수입' : t.type === 'expense' ? '지출' : '이체'}
                         </span>
                       </div>
-                      <div className="tx-dayCol-cat">{t.category_name || '미분류'}</div>
+                      <div className="tx-dayCol-cat">{t.type === 'transfer' ? '이체' : (t.category_name || '미분류')}</div>
                       <div className={`tx-dayCol-amt ${t.type}`}>
                         {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}
                         {formatCurrency(t.amount, currency)}

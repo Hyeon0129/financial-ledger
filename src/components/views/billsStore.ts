@@ -17,6 +17,7 @@ export type RecurringBill = {
   firstPaymentDate: string; // YYYY-MM-DD
   accountId: string;
   categoryId?: string | null; // created child category id (expense, leaf)
+  iconUrl?: string | null;
 };
 
 export type BillItem = RecurringBill & {
@@ -119,6 +120,7 @@ const normalize = (raw: unknown): RecurringBill | null => {
   const accountId = String(r.accountId ?? '');
   const amount = Number(r.amount ?? 0);
   const categoryId = r.categoryId == null ? null : String(r.categoryId);
+  const iconUrl = r.iconUrl == null ? null : String(r.iconUrl);
 
   if (firstPaymentDate && cadence && group) {
     const customEveryDays =
@@ -136,6 +138,7 @@ const normalize = (raw: unknown): RecurringBill | null => {
       firstPaymentDate,
       accountId,
       categoryId,
+      iconUrl,
     };
   }
 
@@ -202,6 +205,7 @@ export const saveBills = (items: RecurringBill[]) => {
         firstPaymentDate: b.firstPaymentDate,
         accountId: b.accountId,
         categoryId: b.categoryId ?? null,
+        iconUrl: b.iconUrl ?? null,
       })),
     ),
   );

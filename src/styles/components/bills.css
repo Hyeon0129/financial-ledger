@@ -34,14 +34,20 @@
 .bills-tableRow {
   display: grid;
   grid-template-columns:
-    minmax(140px, 220px)
+    42px
+    minmax(120px, 200px)
     96px
-    minmax(120px, 1fr)
+    minmax(100px, 1fr)
     120px
     96px
     140px;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+}
+
+.bills-col-icon {
+  display: flex;
+  justify-content: center;
 }
 
 .bills-tableHead {
@@ -91,16 +97,16 @@
 
 .bills-col-date,
 .bills-col-acc,
+.bills-col-amt,
 .bills-col-status,
 .bills-col-actions,
 .bills-tableHead .bills-col-date,
 .bills-tableHead .bills-col-acc,
+.bills-tableHead .bills-col-amt,
 .bills-tableHead .bills-col-status,
 .bills-tableHead .bills-col-actions {
   text-align: center;
 }
-.bills-col-amt,
-.bills-tableHead .bills-col-amt { text-align: right; }
 
 .bills-col-date { color: rgba(255,255,255,0.62); white-space: nowrap; }
 .bills-col-acc { color: rgba(255,255,255,0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

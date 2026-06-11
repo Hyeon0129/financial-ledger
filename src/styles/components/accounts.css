@@ -332,9 +332,15 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
   border-bottom: 1px solid rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.78);
   font-size: 15px;
+  background: transparent;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 .loan-row:last-child { border-bottom: none; }
-.loan-row:hover { background: rgba(255,255,255,0.03); }
+.loan-row:hover { 
+  background: transparent;
+  transform: translateY(-2px);
+  color: rgba(255,255,255,1);
+}
 
 .loan-col-num { text-align: center; font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
 .loan-col-rate,
@@ -346,7 +352,7 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
 
 /* Header centered, but first column values left-aligned */
 .loan-head .loan-col-name { text-align: center; }
-.loan-row .loan-col-name { text-align: left; }
+.loan-row .loan-col-name { text-align: center; }
 
 .loan-name {
   font-weight: 750;
@@ -354,6 +360,7 @@ body[data-theme="dark"] .data-table td:not(:last-child) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
 }
 
 .loan-sub {

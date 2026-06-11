@@ -438,7 +438,7 @@ body[data-theme="dark"] .calendar-transaction-item.expense {
 .tx-dayTableRow:last-child { border-bottom: none; }
 .tx-dayTableRow:hover { background: rgba(255,255,255,0.03); }
 
-.tx-dayCol-dateHead { text-align: center; }
+.tx-dayCol-dateHead { text-align: left; }
 .tx-dayCol-date { text-align: left; color: rgba(255,255,255,0.62); }
 .tx-dayCol-type { text-align: center; }
 .tx-dayCol-cat { text-align: center; }

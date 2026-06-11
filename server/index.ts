@@ -37,7 +37,7 @@ const app = express();
 const PORT = 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Demo user ID (in production, use auth middleware)
 const DEMO_USER_ID = 'demo-user';
@@ -240,7 +240,7 @@ const processLoans = () => {
 
 app.get('/api/transactions', (req, res) => {
   if (AUTO_PROCESS_LOANS) processLoans();
-  const { month, type, category_id } = req.query;
+  const { month, year, type, category_id } = req.query;
   
   let query = `
     SELECT t.*, c.name as category_name, c.color as category_color, a.name as account_name
@@ -254,6 +254,10 @@ app.get('/api/transactions', (req, res) => {
   if (month) {
     query += ` AND strftime('%Y-%m', t.date) = ?`;
     params.push(String(month));
+  }
+  if (year) {
+    query += ` AND strftime('%Y', t.date) = ?`;
+    params.push(String(year));
   }
   if (type && type !== 'all') {
     query += ` AND t.type = ?`;
@@ -923,21 +927,26 @@ app.get('/api/user', (req, res) => {
 });
 
 app.put('/api/user', (req, res) => {
-  const { name, currency } = req.body;
-  
+  const { name, currency, avatar_url } = req.body;
+  const current = db.prepare('SELECT * FROM users WHERE id = ?').get(DEMO_USER_ID) as any;
+
+  const finalName = name !== undefined ? name : current.name;
+  const finalCurrency = currency !== undefined ? currency : current.currency;
+  const finalAvatar = avatar_url !== undefined ? avatar_url : current.avatar_url;
+
   db.prepare(`
-    UPDATE users SET name = ?, currency = ?, updated_at = datetime('now')
+    UPDATE users 
+    SET name = ?, currency = ?, avatar_url = ?, updated_at = datetime('now')
     WHERE id = ?
-  `).run(name, currency, DEMO_USER_ID);
-  
-  const user = db.prepare(`
-    SELECT id, email, name, avatar_url, currency, created_at 
+  `).run(finalName, finalCurrency, finalAvatar, DEMO_USER_ID);
+
+  const updatedUser = db.prepare(`
+    SELECT id, email, name, avatar_url, currency, created_at
     FROM users WHERE id = ?
   `).get(DEMO_USER_ID);
-  
-  res.json(user);
-});
 
+  res.json(updatedUser);
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);

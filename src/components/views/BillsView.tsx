@@ -98,6 +98,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
       firstPaymentDate: defaultDate,
       accountId: accounts[0]?.id ?? '',
       categoryId: null,
+      iconUrl: null,
     });
     setShowModal(true);
   };
@@ -114,6 +115,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
       firstPaymentDate: b.firstPaymentDate,
       accountId: b.accountId,
       categoryId: b.categoryId ?? null,
+      iconUrl: b.iconUrl ?? null,
     });
     setShowModal(true);
   };
@@ -219,9 +221,21 @@ export const BillsView: React.FC<BillsViewProps> = ({
       showAlert('카테고리 자동 생성/연결에 실패했습니다.');
     }
 
-    const next = nextItem.id ? items.map((b) => (b.id === finalItem.id ? finalItem : b)) : [finalItem, ...items];
-    setItems(next);
-    saveBills(next);
+    try {
+      setItems((prev) => {
+        const next = nextItem.id ? prev.map((b) => (b.id === finalItem.id ? finalItem : b)) : [finalItem, ...prev];
+        try {
+          saveBills(next);
+        } catch (e) {
+          console.error('Failed to save to localStorage:', e);
+          showAlert('저장 공간이 부족하여 저장에 실패했습니다. (이미지 크기를 줄여보세요)');
+        }
+        return next;
+      });
+    } catch (e) {
+      console.error(e);
+      showAlert('저장 중 오류가 발생했습니다.');
+    }
 
     // Auto-create transactions for past-due occurrences in the current month.
     try {
@@ -262,8 +276,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 className="panel-title">고정지출</h2>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 }}>
         <button className="btn btn-primary" onClick={openNew}>
           <Icons.Plus /> 새 고정지출
         </button>
@@ -277,6 +290,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </div>
 
             <div className="bills-tableHead">
+              <div className="bills-col-icon" />
               <div className="bills-col-item">항목</div>
               <div className="bills-col-date">결제일</div>
               <div className="bills-col-acc">계좌</div>
@@ -288,6 +302,18 @@ export const BillsView: React.FC<BillsViewProps> = ({
             <div className="bills-tableBody">
               {g.items.map((b) => (
                   <div key={b.id} className="bills-tableRow">
+                    <div className="bills-col-icon">
+                      <div style={{ 
+                        width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.06)', 
+                        border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundImage: b.iconUrl ? `url("${b.iconUrl}")` : undefined,
+                        backgroundSize: 'cover', backgroundPosition: 'center',
+                        fontSize: 12, fontWeight: 'bold'
+                      }}>
+                        {!b.iconUrl && <span style={{ opacity: 0.5 }}>{(b.name[0] || '?').toUpperCase()}</span>}
+                      </div>
+                    </div>
                     <div className="bills-col-item">
                       <span className="bills-itemName" title={b.name}>{b.name}</span>
                       {b.group === 'custom' && b.groupLabel && (
@@ -356,7 +382,16 @@ const BillForm: React.FC<{
   const [customEveryDays, setCustomEveryDays] = useState(String(initial.customEveryDays ?? ''));
   const [firstPaymentDate, setFirstPaymentDate] = useState(initial.firstPaymentDate);
   const [accountId, setAccountId] = useState(initial.accountId);
+  const [iconUrl, setIconUrl] = useState(initial.iconUrl ?? '');
   const [saving, setSaving] = useState(false);
+
+  const handleFile = async (f: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setIconUrl(reader.result);
+    };
+    reader.readAsDataURL(f);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,6 +441,7 @@ const BillForm: React.FC<{
         firstPaymentDate,
         accountId,
         categoryId: initial.categoryId ?? null,
+        iconUrl: iconUrl.trim() || null,
       });
     } finally {
       setSaving(false);
@@ -485,6 +521,27 @@ const BillForm: React.FC<{
               </option>
             ))}
           </select>
+        </div>
+        <div className="form-group bills-form-span2">
+          <label className="form-label">아이콘 URL 또는 이미지</label>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ 
+              width: 48, height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.06)', 
+              border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundImage: iconUrl ? `url(${iconUrl})` : undefined,
+              backgroundSize: 'cover', backgroundPosition: 'center'
+            }}>
+              {!iconUrl && <span style={{ fontWeight: 'bold', opacity: 0.5 }}>{(name[0] || '?').toUpperCase()}</span>}
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input className="form-input" value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="아이콘 URL 입력" />
+              <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', textAlign: 'center' }}>
+                이미지 파일 업로드
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 

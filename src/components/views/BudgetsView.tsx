@@ -88,7 +88,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     setShowModal(true);
   };
 
-  const budgetOrderKey = useMemo(() => `my-ledger:budgets-order-global`, []);
+  const budgetOrderKey = useMemo(() => `my-ledger:budgets-order-global:v2`, []);
   const [budgetOrder, setBudgetOrder] = useState<string[]>([]);
   const [draggingBudgetCatId, setDraggingBudgetCatId] = useState<string | null>(null);
   const [dragOverBudgetCatId, setDragOverBudgetCatId] = useState<string | null>(null);
@@ -120,16 +120,39 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgetsForMonth]);
 
+  const categoryOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let index = 0;
+    for (const opt of validSelectOptions) {
+      if (opt.isOptGroup && opt.kids) {
+        for (const kid of opt.kids) {
+          map.set(kid.id, index++);
+        }
+      } else {
+        map.set(opt.id, index++);
+      }
+    }
+    return map;
+  }, [validSelectOptions]);
+
   const budgetsSorted = useMemo(() => {
     const idx = new Map<string, number>();
     budgetOrder.forEach((id, i) => idx.set(id, i));
-    const withIndex = budgetsForMonth.map((b) => ({ b, i: idx.get(b.category_id) ?? Number.POSITIVE_INFINITY }));
+    const withIndex = budgetsForMonth.map((b) => ({ b, i: idx.get(b.category_id) }));
     withIndex.sort((a, c) => {
-      if (a.i !== c.i) return a.i - c.i;
+      if (a.i !== undefined && c.i !== undefined && a.i !== c.i) return a.i - c.i;
+      if (a.i !== undefined && c.i === undefined) return -1;
+      if (a.i === undefined && c.i !== undefined) return 1;
+
+      // Fallback to category grouping order
+      const catA = categoryOrderMap.get(a.b.category_id) ?? Number.POSITIVE_INFINITY;
+      const catB = categoryOrderMap.get(c.b.category_id) ?? Number.POSITIVE_INFINITY;
+      if (catA !== catB) return catA - catB;
+
       return a.b.created_at < c.b.created_at ? -1 : a.b.created_at > c.b.created_at ? 1 : 0;
     });
     return withIndex.map((x) => x.b);
-  }, [budgetOrder, budgetsForMonth]);
+  }, [budgetOrder, budgetsForMonth, categoryOrderMap]);
 
   const moveBudget = (fromCatId: string, toCatId: string) => {
     const current = budgetsSorted.map((b) => b.category_id);
@@ -223,8 +246,8 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
 
   return (
     <>
-      <div className="budget-grid budgets-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
-        <LiquidPanel>
+      <div className="budget-grid budgets-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'stretch', minHeight: 'calc(100vh - 144px)' }}>
+        <LiquidPanel style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div className="panel-header">
             <div>
               <div className="panel-title">예산 관리</div>
@@ -232,89 +255,93 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
             <button className="btn btn-primary btn-sm" onClick={openCreate}>예산 추가</button>
           </div>
 
-          <div className="transactions-table-lite budgets-table">
+          <div className="budgets-table-wrap">
             <div className="budgets-budgetHead">
               <div className="budgets-cell budgets-cell-cat">카테고리</div>
               <div className="budgets-cell budgets-cell-num">예산</div>
               <div className="budgets-cell budgets-cell-num">사용액</div>
               <div className="budgets-cell budgets-cell-num">잔액</div>
-              <div className="budgets-cell budgets-cell-actions">작업</div>
+              <div className="budgets-cell budgets-cell-status">상태</div>
             </div>
-            {budgetsSorted.map((budget) => {
-              const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
-              const remaining = Math.max(0, budget.amount - spent);
-              const label = budgetLabel(budget.category_id);
-              return (
-                <div
-                  key={budget.id}
-                  className={`budgets-budgetRow ${
-                    draggingBudgetCatId === budget.category_id ? 'is-dragging' : ''
-                  } ${dragOverBudgetCatId === budget.category_id ? 'is-dropTarget' : ''}`}
-                  draggable
-                  onDragStart={(e) => {
-                    const target = e.target as HTMLElement | null;
-                    if (target?.closest('button')) {
-                      e.preventDefault();
-                      return;
-                    }
-                    setDraggingBudgetCatId(budget.category_id);
-                    setDragOverBudgetCatId(null);
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', budget.category_id);
-                    if (e.dataTransfer.setDragImage) {
-                      try {
-                        e.dataTransfer.setDragImage(e.currentTarget, 16, 16);
-                      } catch {
-                        // ignore
+            <div className="budgets-table-scroll">
+              {budgetsSorted.map((budget) => {
+                const spent = stats?.budgetUsage.find(b => b.category_id === budget.category_id)?.spent ?? expenseSpentMap[budget.category_id] ?? 0;
+                const remaining = Math.max(0, budget.amount - spent);
+                const diff = budget.amount - spent;
+                const isOver = diff < 0;
+                const isUnder = diff > 0;
+                const label = budgetLabel(budget.category_id);
+                return (
+                  <div
+                    key={budget.id}
+                    className={`budgets-budgetRow ${
+                      draggingBudgetCatId === budget.category_id ? 'is-dragging' : ''
+                    } ${dragOverBudgetCatId === budget.category_id ? 'is-dropTarget' : ''}`}
+                    draggable
+                    onDragStart={(e) => {
+                      const target = e.target as HTMLElement | null;
+                      if (target?.closest('.budgets-cell-cat')) {
+                        e.preventDefault();
+                        return;
                       }
-                    }
-                  }}
-                  onDragEnd={() => {
-                    setDraggingBudgetCatId(null);
-                    setDragOverBudgetCatId(null);
-                  }}
-                  onDragOver={(e) => {
-                    if (!draggingBudgetCatId) return;
-                    e.preventDefault();
-                    setDragOverBudgetCatId(budget.category_id);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverBudgetCatId === budget.category_id) setDragOverBudgetCatId(null);
-                  }}
-                  onDrop={() => {
-                    if (!draggingBudgetCatId) return;
-                    if (draggingBudgetCatId === budget.category_id) return;
-                    moveBudget(draggingBudgetCatId, budget.category_id);
-                    setDraggingBudgetCatId(null);
-                    setDragOverBudgetCatId(null);
-                  }}
-                >
-                  <div className="budgets-cell budgets-cell-cat">
-                    <span className="budgets-dot" style={{ background: label.color }} />
-                    <div className="budgets-catStack">
-                      <div className="budgets-catName">{label.name}</div>
-                      {label.parentName && <div className="budgets-catParent">{label.parentName}</div>}
+                      setDraggingBudgetCatId(budget.category_id);
+                      setDragOverBudgetCatId(null);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', budget.category_id);
+                      if (e.dataTransfer.setDragImage) {
+                        try {
+                          e.dataTransfer.setDragImage(e.currentTarget, 16, 16);
+                        } catch {
+                          // ignore
+                        }
+                      }
+                    }}
+                    onDragEnd={() => {
+                      setDraggingBudgetCatId(null);
+                      setDragOverBudgetCatId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (!draggingBudgetCatId) return;
+                      e.preventDefault();
+                      setDragOverBudgetCatId(budget.category_id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverBudgetCatId === budget.category_id) setDragOverBudgetCatId(null);
+                    }}
+                    onDrop={() => {
+                      if (!draggingBudgetCatId) return;
+                      if (draggingBudgetCatId === budget.category_id) return;
+                      moveBudget(draggingBudgetCatId, budget.category_id);
+                      setDraggingBudgetCatId(null);
+                      setDragOverBudgetCatId(null);
+                    }}
+                  >
+                    <div className="budgets-cell budgets-cell-cat" style={{ cursor: 'pointer' }} onClick={() => openEdit(budget)}>
+                      <span className="budgets-dot" style={{ background: label.color }} />
+                      <div className="budgets-catStack">
+                        <div className="budgets-catName">{label.name}</div>
+                        {label.parentName && <div className="budgets-catParent">{label.parentName}</div>}
+                      </div>
+                    </div>
+                    <div className="budgets-cell budgets-cell-num">{formatCurrency(budget.amount, currency)}</div>
+                    <div className="budgets-cell budgets-cell-num spent">{formatCurrency(spent, currency)}</div>
+                    <div className="budgets-cell budgets-cell-num remaining">{formatCurrency(remaining, currency)}</div>
+                    <div className="budgets-cell budgets-cell-status" style={{ fontWeight: 800, color: isOver ? 'var(--accent-red)' : isUnder ? 'var(--accent-blue)' : 'var(--text-muted)' }}>
+                      {isOver ? `-${formatCurrency(Math.abs(diff), currency)}` : isUnder ? `+${formatCurrency(diff, currency)}` : '0'}
                     </div>
                   </div>
-                  <div className="budgets-cell budgets-cell-num">{formatCurrency(budget.amount, currency)}</div>
-                  <div className="budgets-cell budgets-cell-num spent">{formatCurrency(spent, currency)}</div>
-                  <div className="budgets-cell budgets-cell-num remaining">{formatCurrency(remaining, currency)}</div>
-                  <div className="budgets-cell budgets-cell-actions">
-                    <button className="btn btn-sm" draggable={false} onClick={() => openEdit(budget)}>수정</button>
-                    <button className="btn btn-sm btn-danger" draggable={false} onClick={() => handleDeleteBudget(budget.id)}>삭제</button>
-                  </div>
+                );
+              })}
+              {budgetsSorted.length === 0 && (
+                <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
+                  예산이 없습니다. 
                 </div>
-		              );
-		            })}
-            {budgetsSorted.length === 0 && (
-              <div className="text-center" style={{ padding: 40, color: 'var(--text-muted)' }}>
-                예산이 없습니다. 
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </LiquidPanel>
 
-        <LiquidPanel>
+        <LiquidPanel style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div className="panel-header">
             <div className="panel-title">지출 내역</div>
             <input
@@ -457,9 +484,14 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                   onChange={(e) => setAmount(e.target.value)}
                 />
               </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>취소</button>
-                <button type="submit" className="btn btn-primary">저장</button>
+              <div className="modal-actions" style={{ justifyContent: editingBudget ? 'space-between' : 'flex-end', width: '100%', marginTop: 16 }}>
+                {editingBudget && (
+                  <button type="button" className="btn btn-danger" onClick={() => { setShowModal(false); handleDeleteBudget(editingBudget.id); }}>삭제</button>
+                )}
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>취소</button>
+                  <button type="submit" className="btn btn-primary">저장</button>
+                </div>
               </div>
             </form>
           </div>

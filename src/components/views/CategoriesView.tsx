@@ -16,6 +16,48 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [collapsedParents, setCollapsedParents] = useState<Record<string, boolean>>({});
 
+  const catOrderKey = 'my-ledger:catOrder:v1';
+  const [categoryOrder, setCategoryOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(catOrderKey) || '[]'); } catch { return []; }
+  });
+  const [draggingCatId, setDraggingCatId] = useState<string | null>(null);
+  const [dragOverCatId, setDragOverCatId] = useState<string | null>(null);
+
+  const persistCatOrder = (next: string[]) => {
+    setCategoryOrder(next);
+    try { localStorage.setItem(catOrderKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  React.useEffect(() => {
+    const existing = new Set(categories.map((c) => c.id));
+    const pruned = categoryOrder.filter((id) => existing.has(id));
+    if (pruned.length !== categoryOrder.length) persistCatOrder(pruned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
+
+  const sortCategories = (cats: Category[]) => {
+    const idx = new Map<string, number>();
+    categoryOrder.forEach((id, i) => idx.set(id, i));
+    const withIndex = cats.map((c) => ({ c, i: idx.get(c.id) ?? Number.POSITIVE_INFINITY }));
+    withIndex.sort((a, c) => {
+      if (a.i !== c.i) return a.i - c.i;
+      return a.c.created_at < c.c.created_at ? -1 : a.c.created_at > c.c.created_at ? 1 : 0;
+    });
+    return withIndex.map((x) => x.c);
+  };
+
+  const moveCategory = (fromId: string, toId: string) => {
+    const sorted = sortCategories(categories);
+    const current = sorted.map((c) => c.id);
+    const fromIdx = current.indexOf(fromId);
+    const toIdx = current.indexOf(toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...current];
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, fromId);
+    persistCatOrder(next);
+  };
+
   const handleEdit = (cat: Category) => {
     setEditingCategory(cat);
     setShowForm(true);
@@ -28,16 +70,48 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
     onRefresh();
   };
 
-  const incomeCategories = useMemo(() => 
-    categories.filter((c) => c.type === 'income'),
-    [categories]
+  const incomeCategories = useMemo(() =>
+    sortCategories(categories.filter((c) => c.type === 'income')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categories, categoryOrder]
   );
-  
-  const expenseCategories = useMemo(() => 
-    categories.filter((c) => c.type === 'expense'),
-    [categories]
+
+  const expenseCategories = useMemo(() =>
+    sortCategories(categories.filter((c) => c.type === 'expense')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categories, categoryOrder]
   );
-  
+
+  const getDragProps = (catId: string) => ({
+    draggable: true,
+    className: `${draggingCatId === catId ? 'is-dragging' : ''} ${dragOverCatId === catId ? 'is-dropTarget' : ''}`,
+    onDragStart: (e: React.DragEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && ['BUTTON', 'INPUT'].includes(target.tagName)) {
+        e.preventDefault();
+        return;
+      }
+      setDraggingCatId(catId);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    },
+    onDragEnter: () => {
+      if (!draggingCatId || draggingCatId === catId) return;
+      setDragOverCatId(catId);
+    },
+    onDragLeave: () => {
+      if (dragOverCatId === catId) setDragOverCatId(null);
+    },
+    onDrop: () => {
+      if (!draggingCatId || draggingCatId === catId) return;
+      moveCategory(draggingCatId, catId);
+      setDraggingCatId(null);
+      setDragOverCatId(null);
+    }
+  });  
   const expenseTree = useMemo(() => {
     const parents = expenseCategories.filter((c) => !c.parent_id);
     const children = expenseCategories.filter((c) => c.parent_id);
@@ -59,8 +133,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
     <>
       <div className="categories-view">
         <div className="cat-pageTop">
-          <div className="cat-pageTopInner">
-            <h2 className="panel-title">카테고리</h2>
+          <div className="cat-pageTopInner" style={{ justifyContent: 'flex-end' }}>
             <button
               className="btn btn-primary"
               onClick={() => {
@@ -73,126 +146,123 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
           </div>
         </div>
 
-        <LiquidPanel className="cat-panel" contentClassName="cat-panelContent" style={{ marginBottom: 24 }}>
-          <div className="panel-header">
-            <div className="panel-title">수입 카테고리</div>
-          </div>
-          <div className="cat-list">
-            <div className="cat-head cat-stickyHead">
-              <div className="cat-col-name">이름</div>
-              <div className="cat-col-actions">작업</div>
-            </div>
-            {incomeCategories.map((cat) => (
-              <div key={cat.id} className="cat-row">
-                <div className="cat-col-name">
-                  <span className="cat-dot" style={{ background: cat.color }} />
-                  <span className="cat-name">{cat.name}</span>
-                </div>
-                <div className="cat-col-actions">
-                  <button className="btn btn-sm" onClick={() => handleEdit(cat)}>
-                    수정
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(cat.id)}>
-                    삭제
-                  </button>
-                </div>
-              </div>
-            ))}
-            {incomeCategories.length === 0 && (
-              <div className="text-center" style={{ padding: 24, color: 'var(--text-muted)' }}>
-                수입 카테고리가 없습니다.
-              </div>
-            )}
-          </div>
-        </LiquidPanel>
-
         <LiquidPanel className="cat-panel" contentClassName="cat-panelContent">
-          <div className="panel-header">
-            <div className="panel-title">지출 카테고리</div>
+          <div className="panel-header" style={{ marginBottom: 24 }}>
+            <div className="panel-title">전체 카테고리</div>
           </div>
-          <div className="cat-grid">
-            <div className="cat-gridHead cat-stickyHead">
-              <div className="cat-col-parent">대분류</div>
-              <div className="cat-col-child">소분류</div>
-              <div className="cat-col-type">구분</div>
-              <div className="cat-col-actions">작업</div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '40px', alignItems: 'start' }}>
+            
+            {/* Left Column: Income */}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent-green)', marginBottom: 16 }}>
+                수입 카테고리
+              </div>
+              <div className="cat-list">
+                {incomeCategories.map((cat) => {
+                  const dragProps = getDragProps(cat.id);
+                  return (
+                    <div 
+                      key={cat.id} 
+                      {...dragProps} 
+                      className={`cat-row cat-hover-group ${dragProps.className}`}
+                      style={{ cursor: 'pointer', padding: '6px 4px', borderBottom: 'none' }}
+                      onClick={() => handleEdit(cat)}
+                    >
+                      <div className="cat-col-name" style={{ gap: 10 }}>
+                        <span className="cat-dot" style={{ background: cat.color, width: 14, height: 14 }} />
+                        <span className="cat-name" style={{ fontSize: 16, fontWeight: 850 }}>{cat.name}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {incomeCategories.length === 0 && (
+                  <div style={{ padding: '8px 4px', color: 'var(--text-muted)', fontSize: 14 }}>없음</div>
+                )}
+              </div>
             </div>
 
-            {expenseTree.grouped.map(({ parent, children }) => {
-              const isCollapsed = !!collapsedParents[parent.id];
-              return (
-                <React.Fragment key={parent.id}>
-                  <div className="cat-gridRow is-parent">
-                    <div className="cat-col-parent">
-                      <button type="button" className="cat-parentBtn" onClick={() => toggleParent(parent.id)}>
-                        <span className={`cat-collapseIcon ${isCollapsed ? 'is-collapsed' : ''}`}>
-                          <Icons.ChevronDown />
-                        </span>
-                        <span className="cat-dot" style={{ background: parent.color }} />
-                        <span className="cat-name">{parent.name}</span>
-                        <span className="cat-count mono">{children.length}</span>
-                      </button>
+            {/* Right Column: Expense */}
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.85)', marginBottom: 16 }}>
+                지출 카테고리
+              </div>
+              
+              <div style={{ columnCount: 3, columnGap: '32px' }}>
+                {/* Expense Parent Blocks */}
+                {expenseTree.grouped.map(({ parent, children }) => {
+                  const dragProps = getDragProps(parent.id);
+                  return (
+                    <div key={parent.id} {...dragProps} className={`cat-hover-group ${dragProps.className}`} style={{ breakInside: 'avoid', marginBottom: 24 }}>
+                      <div 
+                        style={{ fontSize: 16, fontWeight: 850, color: 'rgba(255,255,255,0.95)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                        onClick={() => handleEdit(parent)}
+                      >
+                        <span className="cat-dot" style={{ background: parent.color, width: 14, height: 14 }} />
+                        {parent.name}
+                      </div>
+                      <div className="cat-list">
+                        {children.map((child) => {
+                          const childDragProps = getDragProps(child.id);
+                          return (
+                            <div 
+                              key={child.id} 
+                              {...childDragProps} 
+                              className={`cat-row cat-hover-group ${childDragProps.className}`}
+                              style={{ cursor: 'pointer', padding: '6px 4px', borderBottom: 'none', display: 'flex', alignItems: 'center' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(child);
+                              }}
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, flexShrink: 0 }}>
+                                <path d="M8 0v12a4 4 0 004 4h12" />
+                              </svg>
+                              <div className="cat-col-name" style={{ gap: 8 }}>
+                                <span className="cat-dot" style={{ background: child.color, width: 10, height: 10 }} />
+                                <span className="cat-name" style={{ fontWeight: 650, color: 'rgba(255,255,255,0.8)', fontSize: 15 }}>{child.name}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {children.length === 0 && (
+                          <div style={{ padding: '6px 4px', color: 'var(--text-muted)', fontSize: 14, marginLeft: 24 }}>소분류 없음</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="cat-col-child cat-muted">-</div>
-                    <div className="cat-col-type">대분류</div>
-                    <div className="cat-col-actions">
-                      <button className="btn btn-sm" onClick={() => handleEdit(parent)}>
-                        수정
-                      </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(parent.id)}>
-                        삭제
-                      </button>
+                  );
+                })}
+
+                {/* Orphan Expense Categories Block */}
+                {expenseTree.orphans.length > 0 && (
+                  <div style={{ breakInside: 'avoid', marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 850, color: 'var(--text-muted)', marginBottom: 10 }}>
+                      미분류 지출
+                    </div>
+                    <div className="cat-list">
+                      {expenseTree.orphans.map((child) => {
+                        const dragProps = getDragProps(child.id);
+                        return (
+                          <div 
+                            key={child.id} 
+                            {...dragProps} 
+                            className={`cat-row cat-hover-group ${dragProps.className}`}
+                            style={{ cursor: 'pointer', padding: '6px 4px', borderBottom: 'none' }}
+                            onClick={() => handleEdit(child)}
+                          >
+                            <div className="cat-col-name">
+                              <span className="cat-dot" style={{ background: child.color, width: 12, height: 12 }} />
+                              <span className="cat-name" style={{ fontSize: 16, fontWeight: 750 }}>{child.name}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  {!isCollapsed &&
-                    children.map((child) => (
-                      <div key={child.id} className="cat-gridRow">
-                        <div className="cat-col-parent cat-muted">
-                          <span className="cat-indent">↳</span>
-                          <span className="cat-name">{parent.name}</span>
-                        </div>
-                        <div className="cat-col-child">
-                          <span className="cat-dot" style={{ background: child.color }} />
-                          <span className="cat-name">{child.name}</span>
-                        </div>
-                        <div className="cat-col-type cat-muted">소분류</div>
-                        <div className="cat-col-actions">
-                          <button className="btn btn-sm" onClick={() => handleEdit(child)}>
-                            수정
-                          </button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </React.Fragment>
-              );
-            })}
-
-            {expenseTree.orphans.map((child) => (
-              <div key={child.id} className="cat-gridRow">
-                <div className="cat-col-parent cat-muted">미분류</div>
-                <div className="cat-col-child">
-                  <span className="cat-dot" style={{ background: child.color }} />
-                  <span className="cat-name">{child.name}</span>
-                </div>
-                <div className="cat-col-type cat-muted">소분류</div>
-                <div className="cat-col-actions">
-                  <button className="btn btn-sm" onClick={() => handleEdit(child)}>
-                    수정
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(child.id)}>
-                    삭제
-                  </button>
-                </div>
+                )}
               </div>
-            ))}
+            </div>
 
-            {expenseTree.grouped.length === 0 && expenseTree.orphans.length === 0 && (
-              <div className="cat-empty">지출 카테고리가 없습니다.</div>
-            )}
           </div>
         </LiquidPanel>
       </div>
@@ -207,6 +277,13 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({ categories, onRe
             setEditingCategory(null);
             onRefresh();
           }}
+          onDelete={() => {
+            if (editingCategory) {
+              handleDelete(editingCategory.id);
+              setShowForm(false);
+              setEditingCategory(null);
+            }
+          }}
         />
       )}
     </>
@@ -219,7 +296,8 @@ const CategoryFormModal: React.FC<{
   editingCategory?: Category | null;
   onClose: () => void;
   onSave: () => void;
-}> = ({ categories, editingCategory, onClose, onSave }) => {
+  onDelete?: () => void;
+}> = ({ categories, editingCategory, onClose, onSave, onDelete }) => {
   const [name, setName] = useState(editingCategory?.name || '');
   const [type, setType] = useState<'income' | 'expense'>(
     editingCategory?.type || 'expense'
@@ -408,30 +486,42 @@ const CategoryFormModal: React.FC<{
           <div
             style={{
               display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 8,
-              marginTop: 8,
+              justifyContent: editingCategory ? 'space-between' : 'flex-end',
+              marginTop: 16,
+              width: '100%'
             }}
           >
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={onClose}
-              disabled={saving}
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={saving}
-            >
-              {saving
-                ? '저장 중...'
-                : editingCategory
-                ? '수정 완료'
-                : '카테고리 추가'}
-            </button>
+            {editingCategory && onDelete && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={onDelete}
+                disabled={saving}
+              >
+                삭제
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={onClose}
+                disabled={saving}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}
+              >
+                {saving
+                  ? '저장 중...'
+                  : editingCategory
+                  ? '수정 완료'
+                  : '카테고리 추가'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

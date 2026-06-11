@@ -81,6 +81,7 @@ body[data-theme="dark"] .recharts-default-tooltip {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: calc(100vh - 144px);
 }
 
 .reports-kpiGrid {
